@@ -142,6 +142,7 @@ CILK_ABI_VOID __cilkrts_enter_frame_1(__cilkrts_stack_frame *sf)
 static inline
 void enter_frame_fast_internal(__cilkrts_stack_frame *sf, uint32_t version)
 {
+fprintf(stderr, "XXX enter frame.\n");
     __cilkrts_worker *w = __cilkrts_get_tls_worker_fast();
     sf->flags = version << 24;
     sf->call_parent = w->current_stack_frame;
@@ -158,6 +159,27 @@ CILK_ABI_VOID __cilkrts_enter_frame_fast_1(__cilkrts_stack_frame *sf)
 {
     enter_frame_fast_internal(sf, 1);
     sf->reserved = 0;
+}
+
+__attribute__((always_inline))
+CILK_ABI_VOID __cilkrts_detach(struct __cilkrts_stack_frame *self)
+{
+    struct __cilkrts_worker *w = self->worker;
+    struct __cilkrts_stack_frame *parent = self->call_parent;
+    struct __cilkrts_stack_frame *volatile *tail = w->tail;
+
+    self->spawn_helper_pedigree = w->pedigree;
+    self->call_parent->parent_pedigree = w->pedigree;
+    w->pedigree.rank = 0;
+    w->pedigree.parent = &self->spawn_helper_pedigree;
+
+    /*assert (tail < w->ltq_limit);*/
+    *tail++ = parent;
+
+    /* The stores are separated by a store fence (noop on x86)
+     *  or the second store is a release (st8.rel on Itanium) */
+    w->tail = tail;
+    self->flags |= CILK_FRAME_DETACHED;
 }
 
 /**
