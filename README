@@ -38,8 +38,8 @@ runtime as follows:
 %   CFLAGS="-flto -fno-inline-detach" \
 %   CXXFLAGS="-flto -fno-inline-detach" \
 %   AR_FLAGS="cru --plugin=<the installation of LLVMgold.so>
-% make
-% make install
+% make  
+% make install   
 
 Note that the -flto and -fno-inline-detach flags are necessary even when
 compiling the runtime, because there are spawn / sync statements used in the
@@ -49,8 +49,8 @@ The, compile the user app similarly and link with static library libcilkrts.a.
 (Note that dynamic linking won't inline detach.)
 
 
-Support for Cilktools:
-======================
+Support for Cilktools
+=====================
 
 When compile the user application with -fcilktool, a set of instrumentations 
 will be inserted (see cilkplus_rts/runtime/cilktool.h).  By default, the
@@ -74,12 +74,15 @@ instruction above, with addtional CFLAGS in the configure step:
 %   AR_FLAGS="cru --plugin=<the installation of LLVMgold.so>
 
 (The -flto and AR_FLAGS are necessary to support LTO.)
-
 Then, link the created static library (libcilkrts.a) with the user app.
 
 
 If you have configured the runtime previously, do
-
 % make maintainer-clean 
-
 to remove the Makefile and configuration files from previous install.
+
+Merge with upstream
+===================
+
+Upstream: https://bitbucket.org/intelcilkruntime/intel-cilk-runtime.git
+Last commit merged with upstream: 4bbddb7
