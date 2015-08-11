@@ -34,6 +34,7 @@ ___cilkrts_hyperobject_dealloc
 ___cilkrts_hyperobject_noop_destroy
 ___cilkrts_init
 
+___cilkrts_detach
 ___cilkrts_leave_frame
 ___cilkrts_metacall
 ___cilkrts_resume

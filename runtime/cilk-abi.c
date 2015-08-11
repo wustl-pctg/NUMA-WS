@@ -164,6 +164,7 @@ CILK_ABI_VOID __cilkrts_enter_frame_fast_1(__cilkrts_stack_frame *sf)
 __attribute__((always_inline))
 CILK_ABI_VOID __cilkrts_detach(struct __cilkrts_stack_frame *self)
 {
+fprintf(stderr, "XXX detach called!.\n");
     struct __cilkrts_worker *w = self->worker;
     struct __cilkrts_stack_frame *parent = self->call_parent;
     struct __cilkrts_stack_frame *volatile *tail = w->tail;

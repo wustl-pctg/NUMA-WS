@@ -464,6 +464,11 @@ CILK_ABI(void) __cilkrts_enter_frame_fast(__cilkrts_stack_frame *sf);
 CILK_ABI(void) __cilkrts_enter_frame_fast_1(__cilkrts_stack_frame *sf);
 
 /**
+ * Called by a spawn helper to push the parent frame onto the deque
+ */
+CILK_ABI(void) __cilkrts_detach(__cilkrts_stack_frame *sf);
+
+/**
  * Call leave_frame before leaving a frame, after sync.  This function
  * returns except in a spawn wrapper where the parent has been stolen.
  *

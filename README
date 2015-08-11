@@ -11,8 +11,15 @@ When compile the user application with -fno-inline-detach, the compiled code
 invokes __cilkrts_detach instead of inling it.  Thus, the version implemented 
 in the runtime will be invoked.
 
-In addition, by using LTO (linked-time optimization), one can get the compiler 
-to also inline the detach implemented by the runtime.
+Note that, you will also need to compile the runtime with additional
+-fno-inline-detach flag so that the detach for implementing cilk_for is not
+inlined.
+
+Support for using AND inlining __cilkrts_detach implemeneted in the runtime
+===========================================================================
+
+By using LTO (linked-time optimization), one can get the compiler to also 
+inline the __cilkrts_detach implemented by the runtime.
 
 To allow such inlining, one needs to enable LTO, which requires a few additional steps:
 
@@ -37,7 +44,8 @@ runtime as follows:
 %   CC=clang CXX=clang++ \
 %   CFLAGS="-flto -fno-inline-detach" \
 %   CXXFLAGS="-flto -fno-inline-detach" \
-%   AR_FLAGS="cru --plugin=<the installation of LLVMgold.so>
+%   AR_FLAGS="cru --plugin=<the installation of LLVMgold.so> \
+%   RANLIB=/bin/true
 % make  
 % make install   
 
@@ -45,7 +53,12 @@ Note that the -flto and -fno-inline-detach flags are necessary even when
 compiling the runtime, because there are spawn / sync statements used in the
 runtime to implement cilk_for.
                      
-The, compile the user app similarly and link with static library libcilkrts.a.
+The, compile the user app with the following additional flags:
+CFLAGS = -flto -fno-inline-detach
+CXXFLAGS = -flto -fno-inline-detach
+LDFLAGS = -flto
+
+and link with static library libcilkrts.a.
 (Note that dynamic linking won't inline detach.)
 
 

@@ -66,6 +66,7 @@ __cilkrts_hyperobject_dealloc
 __cilkrts_hyperobject_noop_destroy
 __cilkrts_init
 __cilkrts_irml_version
+__cilkrts_detach
 __cilkrts_leave_frame
 __cilkrts_metacall
 __cilkrts_rethrow
