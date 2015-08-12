@@ -61,6 +61,20 @@ LDFLAGS = -flto
 and link with static library libcilkrts.a.
 (Note that dynamic linking won't inline detach.)
 
+If your gold linker is not installed at the usual location, by default the
+non-gold linker may be invoked.  As a result, you may see errors when
+compiling the user application.  To see which version of the linker is invoked, 
+add a "-v" flag when you invoke clang / clang++.  This will output a message 
+indicating the linker used.  Typically it will be /usr/bin/ld instead of where 
+you installed the gold linker.  
+
+To make the build use the gold linker, the easiest work-around is to create a 
+symbolic link /usr/bin/ld to point to the gold linker.  But that means
+everyone else on that system would be using the gold linker (which is not a
+bad thing, since it's supposedly more efficient).  If that's not a desirable
+outcome, however, you could make ld a small shell script that invokes the
+ordinary ld by default, or something else if an environment variable is set. 
+
 
 Support for Cilktools
 =====================
