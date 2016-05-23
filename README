@@ -4,6 +4,26 @@ of the LLVM Cilk Plus comiler in llvm-cilk / clang-cilk.
 The main difference is that, this runtime implements __cilkrts_detach and 
 has a set of empty functions for the instrumentations used by cilktool.
 
+If you don't plan to use any of the inlining of runtime code and cilktools, 
+follow the vanilla installation instruction:
+
+Vanilla installation:
+==============================================================
+
+Within the src/ dir, configure the runtime as follows:
+(Note that you need to do this once only unless you want to reconfigure the runtime)
+
+% libtoolize
+% aclocal
+% automake --add-missing
+% autoconf
+% ./configure \
+%   --prefix=<where you want to install> \
+%   CC=clang CXX=clang++
+% make  
+% make install
+
+
 Support for using __cilkrts_detach implemeneted in the runtime
 ==============================================================
 
