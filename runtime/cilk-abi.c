@@ -182,6 +182,13 @@ CILK_ABI_VOID __cilkrts_detach(struct __cilkrts_stack_frame *self)
     self->flags |= CILK_FRAME_DETACHED;
 }
 
+CILK_ABI_VOID __cilkrts_pop_frame(struct __cilkrts_stack_frame *sf)
+{
+    struct __cilkrts_worker *w = sf->worker;
+    w->current_stack_frame = sf->call_parent;
+    sf->call_parent = 0;
+}
+
 /**
  * A component of the THE protocol.  __cilkrts_undo_detach checks whether
  * this frame's parent has been stolen.  If it hasn't, the frame can return
@@ -317,6 +324,12 @@ CILK_ABI_VOID __cilkrts_leave_frame(__cilkrts_stack_frame *sf)
 CILK_ABI_VOID __cilkrts_sync(__cilkrts_stack_frame *sf)
 {
     __cilkrts_worker *w = sf->worker;
+
+    if (CILK_FRAME_VERSION_VALUE(sf->flags) >= 1) {
+        sf->parent_pedigree.rank = w->pedigree.rank;
+        sf->parent_pedigree.parent = w->pedigree.parent;
+    }
+
 /*    DBGPRINTF("%d-%p __cilkrts_sync - sf %p\n", w->self, GetWorkerFiber(w), sf); */
     if (__builtin_expect(!(sf->flags & CILK_FRAME_UNSYNCHED), 0))
         __cilkrts_bug("W%u: double sync %p\n", w->self, sf);
@@ -801,6 +814,27 @@ __cilkrts_save_fp_ctrl_state(__cilkrts_stack_frame *sf)
 {
     // Pass call onto OS/architecture dependent function
     sysdep_save_fp_ctrl_state(sf);
+}
+
+/**                                                                             
+ * Update pedigree for a worker when passing cilk_sync successfully             
+ * 
+ * We have just passed a cilk_sync successfully (the sync can be trivial or     
+ * non-trivial, excepting or not-excepting), and we need to update the          
+ * pedigrees rank stored in the worker.  This code used to be inlined in        
+ * the compiled user code, but since we are modifying the shadow frame          
+ * to store a pointer to a deque instead of a pointer to a worker, this         
+ * code can no longer be inlined when the Cilk Plus code is executed by         
+ * this runtime.                                                                
+ **/
+CILK_ABI_VOID update_pedigree_after_sync(__cilkrts_stack_frame *sf)
+{
+    // Update the worker's pedigree information if this is an ABI 1 or later    
+    // frame                                                                    
+    __cilkrts_worker *w = sf->worker;
+    if (CILK_FRAME_VERSION_VALUE(sf->flags) >= 1) {
+        ++(w->pedigree.rank);
+    }
 }
 
 /* end cilk-abi.c */

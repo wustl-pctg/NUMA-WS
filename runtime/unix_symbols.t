@@ -67,6 +67,7 @@ __cilkrts_hyperobject_noop_destroy
 __cilkrts_init
 __cilkrts_irml_version
 __cilkrts_detach
+__cilkrts_pop_frame
 __cilkrts_leave_frame
 __cilkrts_metacall
 __cilkrts_rethrow
@@ -79,6 +80,7 @@ __cilkrts_sync
 __cilkrts_synched
 __cilkrts_watch_stack
 __cilkrts_worker_stub
+update_pedigree_after_sync
 cilk_c_reducer_max_identity_char
 cilk_c_reducer_max_identity_double
 cilk_c_reducer_max_identity_float

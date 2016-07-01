@@ -35,6 +35,7 @@ ___cilkrts_hyperobject_noop_destroy
 ___cilkrts_init
 
 ___cilkrts_detach
+___cilkrts_pop_frame
 ___cilkrts_leave_frame
 ___cilkrts_metacall
 ___cilkrts_resume
@@ -49,6 +50,7 @@ ___cilkrts_sync
 ___cilkrts_synched
 ___cilkrts_watch_stack
 ___cilkrts_worker_stub
+update_pedigree_after_sync
 _cilk_c_reducer_max_identity_char
 _cilk_c_reducer_max_identity_double
 _cilk_c_reducer_max_identity_float
