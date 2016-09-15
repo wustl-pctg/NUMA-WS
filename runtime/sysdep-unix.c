@@ -265,6 +265,9 @@ static void write_version_file (global_state_t *, int);
  */
 static void create_threads(global_state_t *g, int base, int top)
 {
+    //LJ
+    int i;
+ 
     // TBD(11/30/12): We want to insert code providing the option of
     // pinning system workers to cores.
     for (int i = base; i < top; i++) {
@@ -274,6 +277,51 @@ static void create_threads(global_state_t *g, int base, int top)
                                     g->workers[i]);
         if (status != 0)
             __cilkrts_bug("Cilk runtime error: thread creation (%d) failed: %d\n", i, status);
+	//LJ
+	//Affinity setting
+	cpu_set_t process_mask;
+	//Get the mask from the parent thread (master thread)
+	int err = pthread_getaffinity_np (pthread_self(), sizeof(process_mask),&process_mask);
+	if (0 == err)
+	{
+	    //if (i == 0){printf("Program affinity:\n\t");}
+	    int j;
+	    //Get the number of available cores (copied from os-unix.c)
+	    int available_cores = 0;
+	    for (j = 0; j < CPU_SETSIZE; j++){
+	       if (CPU_ISSET(j, &process_mask)){
+		   //if (i == 0){printf(" %d", j);}
+		   available_cores++;
+	       }
+	    }
+	    //if (i == 0){printf("\n");}    
+	    //Bind the worker to a core according worker id
+	    int workermaskid = i % available_cores;
+	    for (j = 0; j < CPU_SETSIZE; j++)
+	    {
+		if (CPU_ISSET(j, &process_mask))
+		{
+		    if (workermaskid == 0){
+			// Bind the worker to the assigned cores
+			cpu_set_t mask;
+			CPU_ZERO(&mask);
+			CPU_SET(j, &mask);
+			int ret_val = pthread_setaffinity_np(g->sysdep->threads[i], sizeof(mask), &mask);
+			if (ret_val != 0)
+			{
+			    printf("ERROR: Could not set CPU affinity");
+			}
+			break;
+		    }
+		    else{
+			workermaskid--;
+		    }
+		}
+	    }
+	}
+	else{
+	    printf("Cannot get affinity mask by pthread_getaffinity_np");
+	}
     }
 }
 
@@ -289,6 +337,35 @@ static void * create_threads_and_work (void * arg)
     create_threads(g, g->P/2, g->P-1);
     // Let the initial thread know that we're done.
     threads_created = 1;
+    
+    //LJ
+    //Affinity setting
+    cpu_set_t process_mask;
+    //Get the mask from the parent thread (master thread)
+    int err = pthread_getaffinity_np (pthread_self(), sizeof(process_mask),&process_mask);
+    if (0 == err)
+    {
+        //printf("Program affinity:\n\t");
+        int j;
+        //for (j = 0; j < CPU_SETSIZE; j++)
+           //if (CPU_ISSET(j, &process_mask))
+               //printf(" %d", j);
+        //printf("\n");
+        for (j = 0; j < CPU_SETSIZE; j++){
+            if (CPU_ISSET(j, &process_mask)){
+                // Bind the thread to the assigned cores
+                cpu_set_t mask;
+                CPU_ZERO(&mask);
+                CPU_SET(j, &mask);
+                int ret_val = pthread_setaffinity_np(g->sysdep->threads[0], sizeof(mask), &mask);
+                if (ret_val != 0) printf("ERROR: Could not set CPU affinity");
+                break;
+            }
+        }
+    }
+    else{
+        printf("Cannot get affinity mask by pthread_getaffinity_np");
+    }
 
     // Ideally this turns into a tail call that wipes out this stack frame.
     return scheduler_thread_proc_for_system_worker(arg);
@@ -328,10 +405,47 @@ void __cilkrts_start_workers(global_state_t *g, int n)
             create_threads(g, 0, n);
 #endif
     }
+
+    //LJ
+    //Affinity setting
+    cpu_set_t process_mask;
+    int err = pthread_getaffinity_np (pthread_self(), sizeof(process_mask),&process_mask);
+    if (0 == err)
+    {
+        int j;
+        int available_cores = 0;
+        for (j = 0; j < CPU_SETSIZE; j++){
+            if (CPU_ISSET(j, &process_mask)){
+                available_cores++;
+            }
+        }
+        int workermaskid = n % available_cores;
+        for (j = 0; j < CPU_SETSIZE; j++)
+        {
+            if (CPU_ISSET(j, &process_mask))
+            {
+                if (workermaskid == 0){
+                    // Bind the thread to the assigned cores
+                    cpu_set_t mask;
+                    CPU_ZERO(&mask);
+                    CPU_SET(j, &mask);
+                    int ret_val = pthread_setaffinity_np(pthread_self(), sizeof(mask), &mask);
+                    if (ret_val != 0) printf("ERROR: Could not set CPU affinity");
+                    break;
+                }
+                else{
+                    workermaskid--;
+                }
+            }
+        }
+    }
+    else{
+        printf("Cannot get affinity mask by pthread_getaffinity_np");
+    }
+
     // write the version information to a file if the environment is configured
     // for it (the function makes the check).
     write_version_file(g, n);
-
 
     return;
 }
