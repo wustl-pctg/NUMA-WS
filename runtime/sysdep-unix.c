@@ -284,13 +284,11 @@ static void create_threads(global_state_t *g, int base, int top)
 	int err = pthread_getaffinity_np (pthread_self(), sizeof(process_mask),&process_mask);
 	if (0 == err)
 	{
-	    if (i == 0){printf("Program affinity:\n\t");}
 	    int j;
 	    //Get the number of available cores (copied from os-unix.c)
 	    int available_cores = 0;
 	    for (j = 0; j < CPU_SETSIZE; j++){
 	       if (CPU_ISSET(j, &process_mask)){
-		   if (i == 0){printf(" %d", j);}
 		   available_cores++;
 	       }
 	    }
@@ -306,7 +304,6 @@ static void create_threads(global_state_t *g, int base, int top)
 			cpu_set_t mask;
 			CPU_ZERO(&mask);
 			CPU_SET(j, &mask);
-			printf("%d %d %d %lu\n",i,workermaskid,j,g->sysdep->threads[i]);
 			int ret_val = pthread_setaffinity_np(g->sysdep->threads[i], sizeof(mask), &mask);
 			if (ret_val != 0)
 			{
@@ -346,12 +343,7 @@ static void * create_threads_and_work (void * arg)
     int err = pthread_getaffinity_np (pthread_self(), sizeof(process_mask),&process_mask);
     if (0 == err)
     {
-        printf("Program affinity:\n\t");
         int j;
-        for (j = 0; j < CPU_SETSIZE; j++)
-           if (CPU_ISSET(j, &process_mask))
-               printf(" %d", j);
-        printf("\n");
         for (j = 0; j < CPU_SETSIZE; j++){
             if (CPU_ISSET(j, &process_mask)){
                 // Bind the thread to the assigned cores
@@ -430,7 +422,6 @@ void __cilkrts_start_workers(global_state_t *g, int n)
                     cpu_set_t mask;
                     CPU_ZERO(&mask);
                     CPU_SET(j, &mask);
-		    printf("%d %d %d %lu\n",n,workermaskid,j,pthread_self());
                     int ret_val = pthread_setaffinity_np(pthread_self(), sizeof(mask), &mask);
                     if (ret_val != 0) printf("ERROR: Could not set CPU affinity");
                     break;
