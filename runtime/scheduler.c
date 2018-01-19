@@ -935,14 +935,14 @@ static void random_steal(__cilkrts_worker *w)
 			/* pick random *other* victim */
 	    	n = steal_rand % 8; //mod # of cores per socket
 
-			/* take the id of the worker and determine the socket,
+			/* take the id of the worker and determine the socket with integer arithmatic,
 			multiply by the number of cores per socket, add a random
 			core number to the socket number*/
-			n = ((w->self % 4) * 8) + n;
+			n = ((w->self / 8) * 8) + n;
 
 	    	if (n >= w->self)
 	    		++n;
-			printf("Locality Steal\nSelf: %d, Victim: %d, Socket: %d, Bottom Core: %d\n", w->self, n, w->self % 4, (w->self % 4) * 8);
+			printf("Locality Steal\nSelf: %d, Victim: %d, Socket: %d, Bottom Core: %d\n", w->self, n, w->self / 8, (w->self / 8) * 8);
 		}
 
     // If we're replaying a log, override the victim.  -1 indicates that
