@@ -900,7 +900,7 @@ static void random_steal(__cilkrts_worker *w)
     __cilkrts_worker *victim = NULL;
     cilk_fiber *fiber = NULL;
     int n;
-	  int locality_rand;
+	int locality_rand;
     unsigned steal_rand;
     int success = 0;
     int32_t victim_id;
@@ -933,8 +933,13 @@ static void random_steal(__cilkrts_worker *w)
 	            ++n;
 		} else { //in all other cases try locality aware steal
 			/* pick random *other* victim */
-	    	n = steal_rand % 4;
-			n = w->self + n; //currnetly only looks at the next 4 workers
+	    	n = steal_rand % 8; //mod # of cores per socket
+
+			/* take the id of the worker and determine the socket,
+			multiply by the number of cores per socket, add a random
+			core number to the socket number*/
+			n = ((w->self % 4) * 8) + n;
+			
 	    	if (n >= w->self)
 	    		++n;
 			printf("Locality Steal\nSelf: %d, Victim: %d\n", w->self, n);
