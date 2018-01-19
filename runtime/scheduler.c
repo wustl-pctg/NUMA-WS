@@ -900,7 +900,7 @@ static void random_steal(__cilkrts_worker *w)
     __cilkrts_worker *victim = NULL;
     cilk_fiber *fiber = NULL;
     int n;
-	int locality_rand;
+	  int locality_rand;
     unsigned steal_rand;
     int success = 0;
     int32_t victim_id;
@@ -926,16 +926,17 @@ static void random_steal(__cilkrts_worker *w)
 		steal_rand = myrand(w);
 		//select which type of stealing to do
 		if(locality_rand == 0) { //do completely random steal if zero
+      		printf("Random Steal\n");
 			/* pick random *other* victim */
 	        n = steal_rand % (w->g->total_workers - 1);
 	        if (n >= w->self)
 	            ++n;
 		} else { //in all other cases try locality aware steal
-			//Temporarilly copying normal steal
 			/* pick random *other* victim */
-	        n = steal_rand % (w->g->total_workers - 1);
-	        if (n >= w->self)
-	            ++n;
+	    	n = steal_rand % 4;
+	    	if (n >= w->self)
+	    		++n;
+			printf("Locality Steal\nSelf: %d, Victim: %d", w->self, n);
 		}
 
     // If we're replaying a log, override the victim.  -1 indicates that
