@@ -901,6 +901,7 @@ static void random_steal(__cilkrts_worker *w)
     cilk_fiber *fiber = NULL;
     int n;
 		int locality_rand;
+		int steal_rand;
     int success = 0;
     int32_t victim_id;
 
@@ -918,13 +919,24 @@ static void random_steal(__cilkrts_worker *w)
        There must be only one worker to prevent stealing. */
     CILK_ASSERT(w->g->total_workers > 1);
 
+		//creates a dependecy between the two events that should be independtly
+		//random. myrand() needs to be replaced later. This is good enough for now.
 		locality_rand = myrand(w) % c_denom;
-		printf("%d\n", locality_rand);
 
-    /* pick random *other* victim */
-    n = myrand(w) % (w->g->total_workers - 1);
-    if (n >= w->self)
-        ++n;
+		steal_rand = myrand(w);
+		//select which type of stealing to do
+		if(locality_rand == 0) { //do completely random steal if zero
+			/* pick random *other* victim */
+	    n = steal_rand % (w->g->total_workers - 1);
+	    if (n >= w->self)
+	        ++n;
+		} else { //in all other cases try locality aware steal
+			//Temporarilly copying normal steal
+			/* pick random *other* victim */
+	    n = steal_rand % (w->g->total_workers - 1);
+	    if (n >= w->self)
+	        ++n;
+		}
 
     // If we're replaying a log, override the victim.  -1 indicates that
     // we've exhausted the list of things this worker stole when we recorded
