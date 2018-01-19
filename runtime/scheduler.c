@@ -900,7 +900,7 @@ static void random_steal(__cilkrts_worker *w)
     __cilkrts_worker *victim = NULL;
     cilk_fiber *fiber = NULL;
     int n;
-		int c;
+		int locality_rand;
     int success = 0;
     int32_t victim_id;
 
@@ -918,8 +918,8 @@ static void random_steal(__cilkrts_worker *w)
        There must be only one worker to prevent stealing. */
     CILK_ASSERT(w->g->total_workers > 1);
 
-		c = myrand(c_denom);
-		printf("%i\n", c % c_denom);
+		locality_rand = myrand(w) % c_denom;
+		printf("%d\n", locality_rand);
 
     /* pick random *other* victim */
     n = myrand(w) % (w->g->total_workers - 1);
