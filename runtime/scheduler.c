@@ -934,9 +934,10 @@ static void random_steal(__cilkrts_worker *w)
 		} else { //in all other cases try locality aware steal
 			/* pick random *other* victim */
 	    	n = steal_rand % 4;
+			n = w->self + n; //currnetly only looks at the next 4 workers
 	    	if (n >= w->self)
 	    		++n;
-			printf("Locality Steal\nSelf: %d, Victim: %d", w->self, n);
+			printf("Locality Steal\nSelf: %d, Victim: %d\n", w->self, n);
 		}
 
     // If we're replaying a log, override the victim.  -1 indicates that
