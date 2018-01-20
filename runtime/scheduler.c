@@ -119,7 +119,10 @@ extern __attribute__((noreturn))
 #   define ASSERT_WORKER_LOCK_OWNED(w)
 #endif // DEBUG_LOCKS
 
-#define c_denom 2
+// Locality Defines
+#define C_DENOM 2
+#define WORKERS_PER_SOCKET 8
+#define NUM_SOCKETS 4
 
 // Options for the scheduler.
 enum schedule_t { SCHEDULE_RUN,
@@ -921,7 +924,7 @@ static void random_steal(__cilkrts_worker *w)
 
 		//creates a dependecy between the two events that should be independtly
 		//random. myrand() needs to be replaced later. This is good enough for now.
-		locality_rand = myrand(w) % c_denom;
+		locality_rand = myrand(w) % C_DENOM;
 
 		steal_rand = myrand(w);
 		//select which type of stealing to do
@@ -942,7 +945,7 @@ static void random_steal(__cilkrts_worker *w)
 
 	    	if (n >= w->self)
 	    		++n;
-			printf("Locality Steal\nSelf: %d, Victim: %d, Socket: %d, Bottom Core: %d\n", w->self, n, w->self / 8, (w->self / 8) * 8);
+			printf("Locality Steal\nSelf: %d, local min: %d, higher min: %d, lower min: %d\n", w->self, w->l->local_min_worker, w->l->higher_neighbor_min_worker, w->l->lower_neighbor_min_worker;
 		}
 
     // If we're replaying a log, override the victim.  -1 indicates that
@@ -2939,6 +2942,14 @@ __cilkrts_worker *make_worker(global_state_t *g,
     w->l->signal_node = NULL;
     // Nothing's been stolen yet
     w->l->worker_magic_1 = WORKER_MAGIC_1;
+
+	// Intitalize locality aware stealing
+	w->l->locality_steal_attempt = 0;
+	w->l->local_min_worker = (w->self / WORKERS_PER_SOCKET) * WORKERS_PER_SOCKET;
+	w->l->higher_neighbor_min_worker = (w->l->local_min_worker + WORKERS_PER_SOCKET) % (WORKERS_PER_SOCKET * NUM_SOCKETS);
+	w->l->lower_neighbor_min_worker = (w->l->local_min_worker - WORKERS_PER_SOCKET) % (WORKERS_PER_SOCKET * NUM_SOCKETS);
+
+
 
     /*w->parallelism_disabled = 0;*/
 
