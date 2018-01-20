@@ -936,16 +936,16 @@ static void random_steal(__cilkrts_worker *w)
 	            ++n;
 		} else { //in all other cases try locality aware steal
 			/* pick random *other* victim */
-	    	n = steal_rand % 8; //mod # of cores per socket
+	    	n = steal_rand % WORKERS_PER_SOCKET; //mod # of cores per socket
 
 			/* take the id of the worker and determine the socket with integer arithmatic,
 			multiply by the number of cores per socket, add a random
 			core number to the socket number*/
-			n = ((w->self / 8) * 8) + n;
+			n = w->l->local_min_worker + n;
 
 	    	if (n >= w->self)
 	    		++n;
-			printf("Locality Steal\nSelf: %d, local min: %d, higher min: %d, lower min: %d\n", w->self, w->l->local_min_worker, w->l->higher_neighbor_min_worker, w->l->lower_neighbor_min_worker);
+			printf("Locality Steal\nSelf: %d, local min: %d, higher min: %d, lower min: %d, victim: %d\n", w->self, w->l->local_min_worker, w->l->higher_neighbor_min_worker, w->l->lower_neighbor_min_worker, n);
 		}
 
     // If we're replaying a log, override the victim.  -1 indicates that
