@@ -945,7 +945,7 @@ static void random_steal(__cilkrts_worker *w)
 
 	    	if (n >= w->self)
 	    		++n;
-			printf("Locality Steal\nSelf: %d, local min: %d, higher min: %d, lower min: %d\n", w->self, w->l->local_min_worker, w->l->higher_neighbor_min_worker, w->l->lower_neighbor_min_worker;
+			printf("Locality Steal\nSelf: %d, local min: %d, higher min: %d, lower min: %d\n", w->self, w->l->local_min_worker, w->l->higher_neighbor_min_worker, w->l->lower_neighbor_min_worker);
 		}
 
     // If we're replaying a log, override the victim.  -1 indicates that
