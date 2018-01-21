@@ -938,7 +938,20 @@ static void random_steal(__cilkrts_worker *w)
 			/* pick random *other* victim */
 	    	n = steal_rand % WORKERS_PER_SOCKET; //mod # of cores per socket
 
-			n = w->l->local_min_worker + n;
+			/* Use different steal attempts based on previous failed attempts */
+			if(w->l->locality_steal_attempt < w->g->total_workers / 4) // less than p/4 steal attempts
+			{
+				n = w->l->local_min_worker + n;
+			} else if (w->l->locality_steal_attempt < w->g->total_workers / 2) { // less than p/2 steal attempts
+				// randomly pick between higher and lower neighbors
+				if(myrand(w) % 2){
+					n = w->l->higher_neighbor_min_worker + n;
+				} else {
+					n = w->l->lower_neighbor_min_worker + n;
+				}
+			} else { // less than p steal attempts
+				n = steal_rand % (w->g->total_workers - 1);
+			}
 
 	    	if (n >= w->self)
 	    		++n;
@@ -1073,7 +1086,7 @@ static void random_steal(__cilkrts_worker *w)
     else
     {
         // If sucess on steal attempt, reset counter. This should always occur
-        // after a locality steal attmept. Doesn't matter with a random attempt. 
+        // after a locality steal attmept. Doesn't matter with a random attempt.
         w->l->locality_steal_attempt = 0;
 
         // Since our steal was successful, finish initialization of
