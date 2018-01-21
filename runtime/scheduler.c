@@ -905,6 +905,7 @@ static void random_steal(__cilkrts_worker *w)
     int n;
 	int locality_rand;
     unsigned steal_rand;
+	int locality_flag = 0;
     int success = 0;
     int32_t victim_id;
 
@@ -928,13 +929,14 @@ static void random_steal(__cilkrts_worker *w)
 
 		steal_rand = myrand(w);
 		//select which type of stealing to do
-		if(locality_rand == 0) { //do completely random steal if zero
+		if(locality_rand == 0 && w->l->locality_steal_attempt == 0) { //do completely random steal if zero
       		printf("Random Steal\n");
 			/* pick random *other* victim */
 	        n = steal_rand % (w->g->total_workers - 1);
 	        if (n >= w->self)
 	            ++n;
 		} else { //in all other cases try locality aware steal
+			locality_flag = 1
 			/* pick random *other* victim */
 	    	n = steal_rand % WORKERS_PER_SOCKET; //mod # of cores per socket
 
@@ -945,7 +947,7 @@ static void random_steal(__cilkrts_worker *w)
 
 	    	if (n >= w->self)
 	    		++n;
-			printf("Locality Steal\nSelf: %d, local min: %d, higher min: %d, lower min: %d, victim: %d\n", w->self, w->l->local_min_worker, w->l->higher_neighbor_min_worker, w->l->lower_neighbor_min_worker, n);
+			printf("Locality Steal\nSelf: %d, local min: %d, higher min: %d, lower min: %d, victim: %d, fail count: %d\n", w->self, w->l->local_min_worker, w->l->higher_neighbor_min_worker, w->l->lower_neighbor_min_worker, n, w->l->locality_steal_attempt);
 		}
 
     // If we're replaying a log, override the victim.  -1 indicates that
@@ -1065,6 +1067,10 @@ static void random_steal(__cilkrts_worker *w)
         // failed to steal work.  Return the fiber to the pool.
         START_INTERVAL(w, INTERVAL_FIBER_DEALLOCATE) {
             int ref_count = cilk_fiber_remove_reference(fiber, &w->l->fiber_pool);
+
+			//if we attempted a locality steal, add one to the counter
+			if(locality_flag) w->l->locality_steal_attempt++;
+
             // Fibers we use when trying to steal should not be active,
             // and thus should not have any other references.
             CILK_ASSERT(0 == ref_count);
@@ -1079,6 +1085,9 @@ static void random_steal(__cilkrts_worker *w)
         // Record the pedigree of the frame that w has stolen.
         // record only if CILK_RECORD_LOG is set
         replay_record_steal(w, victim_id);
+
+		//on sucess reset the locality steal counter
+		w->l->locality_steal_attempt = 0;
     }
 }
 
