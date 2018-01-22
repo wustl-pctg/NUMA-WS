@@ -922,7 +922,7 @@ static void random_steal(__cilkrts_worker *w)
 
 		steal_rand = myrand(w);
 		//select which type of stealing to do
-		if(locality_rand == 0 && w->l->locality_steal_attempt == 0) { //do completely random steal if zero
+		if(locality_rand == 0) { //do completely random steal if zero
       		//printf("Random Steal\n");
 			/* pick random *other* victim */
 	        n = steal_rand % (w->g->total_workers - 1);
@@ -933,7 +933,9 @@ static void random_steal(__cilkrts_worker *w)
 			/* pick random *other* victim */
 	    	n = steal_rand % w->g->workers_per_socket; //mod # of cores per socket
 
-			/* Use different steal attempts based on previous failed attempts */
+			/* Use different steal attempts based on previous failed attempts.
+			 * This starts over at p/4 on ANY success.
+			 */
 			if(w->l->locality_steal_attempt < w->g->total_workers / 4) // less than p/4 steal attempts
 			{
 				n = w->l->local_min_worker + n;
@@ -1080,8 +1082,8 @@ static void random_steal(__cilkrts_worker *w)
     }
     else
     {
-        // If sucess on steal attempt, reset counter. This should always occur
-        // after a locality steal attmept. Doesn't matter with a random attempt.
+        // If sucess on steal attempt, reset counter.
+		// On any sucess, the locality steal will start over at p/4
         w->l->locality_steal_attempt = 0;
 
         // Since our steal was successful, finish initialization of
