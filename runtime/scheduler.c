@@ -119,11 +119,6 @@ extern __attribute__((noreturn))
 #   define ASSERT_WORKER_LOCK_OWNED(w)
 #endif // DEBUG_LOCKS
 
-// Locality Defines
-#define C_DENOM 2
-#define WORKERS_PER_SOCKET 8
-#define NUM_SOCKETS 4
-
 // Options for the scheduler.
 enum schedule_t { SCHEDULE_RUN,
                   SCHEDULE_WAIT,
@@ -923,7 +918,7 @@ static void random_steal(__cilkrts_worker *w)
        There must be only one worker to prevent stealing. */
     CILK_ASSERT(w->g->total_workers > 1);
 
-		locality_rand = myrand(w) % C_DENOM;
+		locality_rand = myrand(w) % w->g->locality_ratio;
 
 		steal_rand = myrand(w);
 		//select which type of stealing to do
@@ -936,7 +931,7 @@ static void random_steal(__cilkrts_worker *w)
 		} else { //in all other cases try locality aware steal
 			locality_flag = 1;
 			/* pick random *other* victim */
-	    	n = steal_rand % WORKERS_PER_SOCKET; //mod # of cores per socket
+	    	n = steal_rand % w->g->workers_per_socket; //mod # of cores per socket
 
 			/* Use different steal attempts based on previous failed attempts */
 			if(w->l->locality_steal_attempt < w->g->total_workers / 4) // less than p/4 steal attempts
@@ -2962,9 +2957,9 @@ __cilkrts_worker *make_worker(global_state_t *g,
 
 	// Intitalize locality aware stealing
 	w->l->locality_steal_attempt = 0;
-	w->l->local_min_worker = (w->self / WORKERS_PER_SOCKET) * WORKERS_PER_SOCKET;
-	w->l->higher_neighbor_min_worker = (w->l->local_min_worker + WORKERS_PER_SOCKET) % (WORKERS_PER_SOCKET * NUM_SOCKETS);
-	w->l->lower_neighbor_min_worker = (w->l->local_min_worker - WORKERS_PER_SOCKET) % (WORKERS_PER_SOCKET * NUM_SOCKETS);
+	w->l->local_min_worker = (w->self / w->g->workers_per_socket) * w->g->workers_per_socket;
+	w->l->higher_neighbor_min_worker = (w->l->local_min_worker + w->g->workers_per_socket) % (w->g->workers_per_socket * w->g->num_sockets);
+	w->l->lower_neighbor_min_worker = (w->l->local_min_worker - w->g->workers_per_socket) % (w->g->workers_per_socket * w->g->num_sockets);
 
 
 

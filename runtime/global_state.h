@@ -4,11 +4,11 @@
  *
  *  Copyright (C) 2009-2015, Intel Corporation
  *  All rights reserved.
- *  
+ *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted provided that the following conditions
  *  are met:
- *  
+ *
  *    * Redistributions of source code must retain the above copyright
  *      notice, this list of conditions and the following disclaimer.
  *    * Redistributions in binary form must reproduce the above copyright
@@ -18,7 +18,7 @@
  *    * Neither the name of Intel Corporation nor the names of its
  *      contributors may be used to endorse or promote products derived
  *      from this software without specific prior written permission.
- *  
+ *
  *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -31,9 +31,9 @@
  *  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY
  *  WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
- *  
+ *
  *  *********************************************************************
- *  
+ *
  *  PLEASE NOTE: This file is a downstream copy of a file mainitained in
  *  a repository at cilkplus.org. Changes made to this file that are not
  *  submitted through the contribution process detailed at
@@ -42,7 +42,7 @@
  *  GNU compiler collection or posted to the git repository at
  *  https://bitbucket.org/intelcilkplusruntime/itnel-cilk-runtime.git are
  *  not tracked.
- *  
+ *
  *  We welcome your contributions to this open source project. Thank you
  *  for your assistance in helping us improve Cilk Plus.
  **************************************************************************/
@@ -143,7 +143,7 @@ struct global_state_t { /* COMMON_PORTABLE */
      * 0 unless set by user.  Call cilkg_calc_max_user_workers to get
      * the value.
      */
-    int max_user_workers; 
+    int max_user_workers;
 
     int total_workers;  ///< Total number of worker threads allocated (fixed)
 
@@ -169,14 +169,14 @@ struct global_state_t { /* COMMON_PORTABLE */
      * TRUE if running a p-tool that requires reducers to call the reduce()
      * method even if no actual stealing occurs.
      *
-     * When set to TRUE, runtime will simulate steals, forcing calls to the 
+     * When set to TRUE, runtime will simulate steals, forcing calls to the
      * the reduce() methods of reducers.
      *
      */
-    int force_reduce;    
+    int force_reduce;
 
     /// USER SETTING: Per-worker fiber pool size
-    int fiber_pool_size; 
+    int fiber_pool_size;
 
     /// USER SETTING: Global fiber pool size
     int global_fiber_pool_size;
@@ -204,7 +204,7 @@ struct global_state_t { /* COMMON_PORTABLE */
      *
      * If max_stacks == 0,there is no pre-defined maximum.
      */
-    unsigned max_stacks; 
+    unsigned max_stacks;
 
     /// Size of each stack
     size_t stack_size;
@@ -219,7 +219,7 @@ struct global_state_t { /* COMMON_PORTABLE */
     /**
      * @brief Track whether the runtime has failed to allocate a
      * stack.
-     * 
+     *
      * Setting this flag prevents multiple warnings from being
      * issued.
      */
@@ -266,7 +266,16 @@ struct global_state_t { /* COMMON_PORTABLE */
     char cache_buf_2[64];
 
     int P;         ///< USER SETTING: number of system workers + 1 (fixed)
-    int Q;         ///< Number of user threads currently bound to workers 
+    int Q;         ///< Number of user threads currently bound to workers
+
+    /**
+     * The below secion contains the global varaibles for the parameters of the
+     * locality stealing.
+     */
+
+    int locality_ratio; // the denominator to determine the regular work stealing likelyhood
+    int num_sockets; // the number of sockets used in the computation
+    int workers_per_socket // the number of workers on each socket
 };
 
 /**
@@ -427,7 +436,7 @@ size_t cilkg_get_stack_size(void)
  *
  * Look up the scheduler function in global_state and run it.  Report a fatal
  * error if an exception escapes the scheduler function.
- * 
+ *
  * @param w - Worker structure to associate with the current thread.
  *
  * @attention The scheduler field of the global state must be set before this
