@@ -2956,7 +2956,6 @@ __cilkrts_worker *make_worker(global_state_t *g,
     w->l->worker_magic_1 = WORKER_MAGIC_1;
 
 	// Intitalize locality aware stealing
-	printf("Wokers Per Socket: %d, Num Sockets: %d, Locality Ratio: %d\n", w->g->workers_per_socket, w->g->num_sockets, w->g->locality_ratio);
 	w->l->locality_steal_attempt = 0;
 	w->l->local_min_worker = (w->self / w->g->workers_per_socket) * w->g->workers_per_socket;
 	w->l->higher_neighbor_min_worker = (w->l->local_min_worker + w->g->workers_per_socket) % (w->g->workers_per_socket * w->g->num_sockets);
