@@ -5,11 +5,11 @@
  *
  *  Copyright (C) 2010-2015, Intel Corporation
  *  All rights reserved.
- *  
+ *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted provided that the following conditions
  *  are met:
- *  
+ *
  *    * Redistributions of source code must retain the above copyright
  *      notice, this list of conditions and the following disclaimer.
  *    * Redistributions in binary form must reproduce the above copyright
@@ -19,7 +19,7 @@
  *    * Neither the name of Intel Corporation nor the names of its
  *      contributors may be used to endorse or promote products derived
  *      from this software without specific prior written permission.
- *  
+ *
  *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -32,9 +32,9 @@
  *  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY
  *  WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
- *  
+ *
  *  *********************************************************************
- *  
+ *
  *  PLEASE NOTE: This file is a downstream copy of a file mainitained in
  *  a repository at cilkplus.org. Changes made to this file that are not
  *  submitted through the contribution process detailed at
@@ -43,7 +43,7 @@
  *  GNU compiler collection or posted to the git repository at
  *  https://bitbucket.org/intelcilkplusruntime/itnel-cilk-runtime.git are
  *  not tracked.
- *  
+ *
  *  We welcome your contributions to this open source project. Thank you
  *  for your assistance in helping us improve Cilk Plus.
  *
@@ -98,15 +98,15 @@
 #endif
 
 #ifdef  __VXWORKS__
-#   include <vxWorks.h>   
-#   include <vxCpuLib.h>  
+#   include <vxWorks.h>
+#   include <vxCpuLib.h>
 #endif
 
 struct global_sysdep_state
 {
     pthread_t *threads;    ///< Array of pthreads for system workers
     size_t pthread_t_size; ///< for cilk_db
-}; 
+};
 
 static void internal_enforce_global_visibility();
 
@@ -133,7 +133,7 @@ void __cilkrts_init_global_sysdep(global_state_t *g)
     g->sysdep = __cilkrts_malloc(sizeof (struct global_sysdep_state));
     CILK_ASSERT(g->sysdep);
     g->sysdep->pthread_t_size = sizeof (pthread_t);
-    
+
     // TBD: Should this value be g->total_workers, or g->P?
     //      Need to check what we are using this field for.
     g->sysdep->threads = __cilkrts_malloc(sizeof(pthread_t) * g->total_workers);
@@ -189,7 +189,7 @@ NON_COMMON void* scheduler_thread_proc_for_system_worker(void *arg)
     CILK_ASSERT(w->l->type == WORKER_SYSTEM);
     /*status = pthread_mutex_unlock(&__cilkrts_global_mutex);
     CILK_ASSERT(status == 0);*/
-    
+
     __cilkrts_set_tls_worker(w);
 
     START_INTERVAL(w, INTERVAL_IN_SCHEDULER);
@@ -203,7 +203,7 @@ NON_COMMON void* scheduler_thread_proc_for_system_worker(void *arg)
     } STOP_INTERVAL(w, INTERVAL_FIBER_ALLOCATE_FROM_THREAD);
 
     STOP_INTERVAL(w, INTERVAL_INIT_WORKER);
-    
+
     internal_run_scheduler_with_exceptions(w);
 
     START_INTERVAL(w, INTERVAL_FIBER_DEALLOCATE_FROM_THREAD) {
@@ -217,7 +217,7 @@ NON_COMMON void* scheduler_thread_proc_for_system_worker(void *arg)
         CILK_ASSERT(0 == ref_count);
         w->l->scheduling_fiber = NULL;
     } STOP_INTERVAL(w, INTERVAL_FIBER_DEALLOCATE_FROM_THREAD);
-    
+
     STOP_INTERVAL(w, INTERVAL_IN_RUNTIME);
     STOP_INTERVAL(w, INTERVAL_IN_SCHEDULER);
     return 0;
@@ -229,7 +229,7 @@ NON_COMMON void* scheduler_thread_proc_for_system_worker(void *arg)
  *
  * This function is exported so Piersol's stack trace displays
  * reasonable information.
- */ 
+ */
 void* __cilkrts_worker_stub(void* arg)
 {
     return scheduler_thread_proc_for_system_worker(arg);
@@ -265,9 +265,6 @@ static void write_version_file (global_state_t *, int);
  */
 static void create_threads(global_state_t *g, int base, int top)
 {
-    //LJ
-    int i;
- 
     // TBD(11/30/12): We want to insert code providing the option of
     // pinning system workers to cores.
     for (int i = base; i < top; i++) {
@@ -277,93 +274,9 @@ static void create_threads(global_state_t *g, int base, int top)
                                     g->workers[i]);
         if (status != 0)
             __cilkrts_bug("Cilk runtime error: thread creation (%d) failed: %d\n", i, status);
-	//LJ
-	//Affinity setting
-	cpu_set_t process_mask;
-	//Get the mask from the parent thread (master thread)
-	int err = pthread_getaffinity_np (pthread_self(), sizeof(process_mask),&process_mask);
-	if (0 == err)
-	{
-	    int j;
-	    //Get the number of available cores (copied from os-unix.c)
-	    int available_cores = 0;
-	    for (j = 0; j < CPU_SETSIZE; j++){
-	       if (CPU_ISSET(j, &process_mask)){
-		   available_cores++;
-	       }
-	    }
-	    if (i == 0){printf("\n");}    
-	    //Bind the worker to a core according worker id
-	    int workermaskid = i % available_cores;
-	    for (j = 0; j < CPU_SETSIZE; j++)
-	    {
-		if (CPU_ISSET(j, &process_mask))
-		{
-		    if (workermaskid == 0){
-			// Bind the worker to the assigned cores
-			cpu_set_t mask;
-			CPU_ZERO(&mask);
-			CPU_SET(j, &mask);
-			int ret_val = pthread_setaffinity_np(g->sysdep->threads[i], sizeof(mask), &mask);
-			if (ret_val != 0)
-			{
-			    printf("ERROR: Could not set CPU affinity");
-			}
-			break;
-		    }
-		    else{
-			workermaskid--;
-		    }
-		}
-	    }
-	}
-	else{
-	    printf("Cannot get affinity mask by pthread_getaffinity_np");
-	}
     }
 }
 
-#if PARALLEL_THREAD_CREATE
-static int volatile threads_created = 0;
-
-// Create approximately half of the worker threads, and then become a worker
-// ourselves.
-static void * create_threads_and_work (void * arg)
-{
-    global_state_t *g = ((__cilkrts_worker *)arg)->g;
-
-    create_threads(g, g->P/2, g->P-1);
-    // Let the initial thread know that we're done.
-    threads_created = 1;
-    
-    //LJ
-    //Affinity setting
-    cpu_set_t process_mask;
-    //Get the mask from the parent thread (master thread)
-    int err = pthread_getaffinity_np (pthread_self(), sizeof(process_mask),&process_mask);
-    if (0 == err)
-    {
-        int j;
-        for (j = 0; j < CPU_SETSIZE; j++){
-            if (CPU_ISSET(j, &process_mask)){
-                // Bind the thread to the assigned cores
-                cpu_set_t mask;
-                CPU_ZERO(&mask);
-                CPU_SET(j, &mask);
-                int ret_val = pthread_setaffinity_np(g->sysdep->threads[0], sizeof(mask), &mask);
-                if (ret_val != 0) printf("ERROR: Could not set CPU affinity");
-                break;
-            }
-        }
-    }
-    else{
-        printf("Cannot get affinity mask by pthread_getaffinity_np");
-    }
-
-    // Ideally this turns into a tail call that wipes out this stack frame.
-    return scheduler_thread_proc_for_system_worker(arg);
-}
-#endif
 void __cilkrts_start_workers(global_state_t *g, int n)
 {
     g->workers_running = 1;
@@ -375,64 +288,30 @@ void __cilkrts_start_workers(global_state_t *g, int n)
     // Do we actually have any threads to create?
     if (n > 0)
     {
-#if PARALLEL_THREAD_CREATE
-            int status;
-            // We create (a rounded up) half of the threads, thread one creates the rest
-            int half_threads = (n+1)/2;
-        
-            // Create the first thread passing a different thread function, so that it creates threads itself
-            status = pthread_create(&g->sysdep->threads[0], NULL, create_threads_and_work, g->workers[0]);
-
-            if (status != 0)
-                __cilkrts_bug("Cilk runtime error: thread creation (0) failed: %d\n", status);
-            
-            // Then the rest of the ones we have to create
-            create_threads(g, 1, half_threads);
-
-            // Now wait for the first created thread to tell us it's created all of its threads.
-            // We could maybe drop this a bit lower and overlap with write_version_file.
-            while (!threads_created)
-                __cilkrts_yield();
-#else
             // Simply create all the threads linearly here.
             create_threads(g, 0, n);
-#endif
     }
 
     //LJ
     //Affinity setting
     cpu_set_t process_mask;
+    //Get the mask from the parent thread (master thread)
     int err = pthread_getaffinity_np (pthread_self(), sizeof(process_mask),&process_mask);
-    if (0 == err)
-    {
-        int j;
-        int available_cores = 0;
-        for (j = 0; j < CPU_SETSIZE; j++){
-            if (CPU_ISSET(j, &process_mask)){
-                available_cores++;
+    if (0 == err) {
+        for (int j = 0; j < g->total_workers; j++) {
+            if (CPU_ISSET(j, &process_mask)) {
+                // Bind the worker to the assigned cores
+                cpu_set_t mask;
+                CPU_ZERO(&mask);
+                CPU_SET(j, &mask);
+                int ret_val = pthread_setaffinity_np(g->sysdep->threads[j], sizeof(mask), &mask);
+                if (ret_val != 0) {
+                    printf("ERROR: Could not set CPU affinity");
+                }
+                break;
             }
         }
-        int workermaskid = n % available_cores;
-        for (j = 0; j < CPU_SETSIZE; j++)
-        {
-            if (CPU_ISSET(j, &process_mask))
-            {
-                if (workermaskid == 0){
-                    // Bind the thread to the assigned cores
-                    cpu_set_t mask;
-                    CPU_ZERO(&mask);
-                    CPU_SET(j, &mask);
-                    int ret_val = pthread_setaffinity_np(pthread_self(), sizeof(mask), &mask);
-                    if (ret_val != 0) printf("ERROR: Could not set CPU affinity");
-                    break;
-                }
-                else{
-                    workermaskid--;
-                }
-            }
-        }
-    }
-    else{
+    } else {
         printf("Cannot get affinity mask by pthread_getaffinity_np");
     }
 
@@ -497,11 +376,11 @@ static char* get_sp_for_executing_sf(char* stack_base,
 // pointer when resuming execution.
 //
 // But this code was never getting called in the eng branch anyway...
-// 
+//
 // TBD(11/30/12): This logic needs to be revisited to make sure that
 // we are doing the proper calculation in reserving space for outgoing
 // arguments on all platforms and architectures.
-#if 0    
+#if 0
     /* Preserve outgoing argument space and stack alignment on steal.
        Outgoing argument space is bounded by the difference between
        stack and frame pointers.  Some user code is known to rely on
@@ -526,10 +405,10 @@ static char* get_sp_for_executing_sf(char* stack_base,
 
         return top_aligned - space;
     }
-#endif    
+#endif
 
 #define PERFORM_FRAME_SIZE_CALCULATION 0
-    
+
     char* new_stack_base = stack_base - 256;
 
 #if PERFORM_FRAME_SIZE_CALCULATION
@@ -548,7 +427,7 @@ static char* get_sp_for_executing_sf(char* stack_base,
         }
     }
 #endif
-    
+
     // Whatever correction we choose, align the final stack top.
     // This alignment seems to be necessary in particular on 32-bit
     // Linux, and possibly Mac. (Is 32-byte alignment is sufficient?)
@@ -579,7 +458,7 @@ char* sysdep_reset_jump_buffers_for_resume(cilk_fiber* fiber,
 
     // Adjust the saved_sp to account for the SP we're about to run.  This will
     // allow us to track fluctations in the stack
-#if FIBER_DEBUG >= 4    
+#if FIBER_DEBUG >= 4
     fprintf(stderr, "ThreadId=%p, about to take stack ff=%p, sp=%p, sync_sp=%p\n",
             cilkos_get_current_thread_id(),
             ff,
@@ -735,10 +614,10 @@ static void write_version_file (global_state_t *g, int n)
             VERSION_MINOR,
             VERSION_REV,
             VERSION_BUILD);
-#ifdef __VXWORKS__    
-    char * vxWorksVer = VXWORKS_VERSION; 
+#ifdef __VXWORKS__
+    char * vxWorksVer = VXWORKS_VERSION;
     fprintf(fp, "Cross compiled for %s\n",vxWorksVer);
-    // user and host not avalible if VxWorks cross compiled on windows build host 
+    // user and host not avalible if VxWorks cross compiled on windows build host
 #else
 
     // User and host are not available for GCC builds
@@ -748,7 +627,7 @@ static void write_version_file (global_state_t *g, int n)
 #endif // __VXWORKS__
 
     // GCC has requested that this be removed for GCC builds
-#ifdef BUILD_USER    
+#ifdef BUILD_USER
     fprintf(fp, "Compilation date: "__DATE__" "__TIME__"\n");
 #endif // BUILD_USER
 
@@ -800,11 +679,11 @@ static void write_version_file (global_state_t *g, int n)
 
     fprintf(fp, "\nThread information\n");
     fprintf(fp, "==================\n");
-#ifdef __VXWORKS__      
+#ifdef __VXWORKS__
     fprintf(fp, "System cores: %d\n", (int)__builtin_popcount(vxCpuEnabledGet()));
-#else    
+#else
     fprintf(fp, "System cores: %d\n", (int)sysconf(_SC_NPROCESSORS_ONLN));
-#endif    
+#endif
     fprintf(fp, "Cilk workers requested: %d\n", n);
 #if (PARALLEL_THREAD_CREATE)
         fprintf(fp, "Thread creator: Private (parallel)\n");
