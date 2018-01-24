@@ -291,22 +291,26 @@ void __cilkrts_start_workers(global_state_t *g, int n)
             // Simply create all the threads linearly here.
             create_threads(g, 0, n);
     }
-
-    //Get the mask from the parent thread (master thread)
-    int err = pthread_getaffinity_np (pthread_self(), sizeof(process_mask),&process_mask);
-    if (0 == err) {
-        for (int j = 0; j < g->total_workers; j++) {
-            cpu_set_t mask;
-            CPU_ZERO(&mask);
-            CPU_SET(j, &mask);
-            int ret_val = pthread_setaffinity_np(g->sysdep->threads[j], sizeof(mask), &mask);
-            if (ret_val != 0) {
-                printf("ERROR: Could not set CPU affinity");
-            }
-        }
-    } else {
-        printf("Cannot get affinity mask by pthread_getaffinity_np");
+    
+    //First pin the user thread to core 0
+    cpu_set_t mask;
+    CPU_ZERO(&mask);
+    CPU_SET(0, &mask);
+    int ret_val = pthread_setaffinity_np(pthread_self(), sizeof(mask), &mask);
+    if (ret_val != 0) {
+        printf("ERROR: Could not set CPU affinity");
     }
+
+    //Itterate through the workers and pin them to a core
+    for (int j = 1; j < g->P; j++) {
+        cpu_set_t mask;
+        CPU_ZERO(&mask);
+        CPU_SET(j, &mask);
+        int ret_val = pthread_setaffinity_np(g->sysdep->threads[j - 1], sizeof(mask), &mask);
+        if (ret_val != 0) {
+            printf("ERROR: Could not set CPU affinity");
+        }
+    }  
 
     // write the version information to a file if the environment is configured
     // for it (the function makes the check).
