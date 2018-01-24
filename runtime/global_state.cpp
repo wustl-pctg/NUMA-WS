@@ -508,8 +508,6 @@ global_state_t* cilkg_get_user_settable_values()
     // Initialize locality variables
     g->locality_ratio = 2; // 2 for equal likelyhood
     g->num_sockets = numa_num_configured_nodes(); //set to the total number of nodes on the system
-    // Is there a better way to do what's below???
-    g->workers_per_socket = g->total_workers / g->num_sockets; //set to num cores on each socket
 
     // Environment variables for locality
     if (cilkos_getenv(envstr, sizeof(envstr), "CILK_LOCALITY_RATIO"))
@@ -519,6 +517,8 @@ global_state_t* cilkg_get_user_settable_values()
     if (cilkos_getenv(envstr, sizeof(envstr), "CILK_NUM_SOCKETS"))
         // Limit to no less than 1 and no more than 4
         store_int(&g->num_sockets, envstr, 1, 4);
+
+    g->workers_per_socket = g->P / g->num_sockets; //set to num cores on each socket
 
     return g;
 }
