@@ -292,23 +292,16 @@ void __cilkrts_start_workers(global_state_t *g, int n)
             create_threads(g, 0, n);
     }
 
-    //LJ
-    //Affinity setting
-    cpu_set_t process_mask;
     //Get the mask from the parent thread (master thread)
     int err = pthread_getaffinity_np (pthread_self(), sizeof(process_mask),&process_mask);
     if (0 == err) {
         for (int j = 0; j < g->total_workers; j++) {
-            if (CPU_ISSET(j, &process_mask)) {
-                // Bind the worker to the assigned cores
-                cpu_set_t mask;
-                CPU_ZERO(&mask);
-                CPU_SET(j, &mask);
-                int ret_val = pthread_setaffinity_np(g->sysdep->threads[j], sizeof(mask), &mask);
-                if (ret_val != 0) {
-                    printf("ERROR: Could not set CPU affinity");
-                }
-                break;
+            cpu_set_t mask;
+            CPU_ZERO(&mask);
+            CPU_SET(j, &mask);
+            int ret_val = pthread_setaffinity_np(g->sysdep->threads[j], sizeof(mask), &mask);
+            if (ret_val != 0) {
+                printf("ERROR: Could not set CPU affinity");
             }
         }
     } else {
