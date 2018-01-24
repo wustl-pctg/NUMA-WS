@@ -917,7 +917,7 @@ static void random_steal(__cilkrts_worker *w)
     /* If there is only one processor work can still be stolen.
        There must be only one worker to prevent stealing. */
     CILK_ASSERT(w->g->total_workers > 1);
-
+        
 		locality_rand = myrand(w) % w->g->locality_ratio;
 
 		steal_rand = myrand(w);
@@ -925,21 +925,21 @@ static void random_steal(__cilkrts_worker *w)
 		if(locality_rand == 0) { //do completely random steal if zero
       		//printf("Random Steal\n");
 			/* pick random *other* victim */
-	        n = steal_rand % (w->g->total_workers - 1);
+	        n = steal_rand % (w->g->P - 1);
 	        if (n >= w->self)
 	            ++n;
 		} else { //in all other cases try locality aware steal
 			locality_flag = 1;
 			/* pick random *other* victim */
-	    	n = steal_rand % w->g->workers_per_socket; //mod # of cores per socket
+	    	n = steal_rand % (w->g->workers_per_socket -1); //mod # of cores per socket
 
 			/* Use different steal attempts based on previous failed attempts.
 			 * This starts over at p/4 on ANY success.
 			 */
-			if(w->l->locality_steal_attempt < w->g->total_workers / 4) // less than p/4 steal attempts
+			if(w->l->locality_steal_attempt < w->g->P / 4) // less than p/4 steal attempts
 			{
 				n = w->l->local_min_worker + n;
-			} else if (w->l->locality_steal_attempt < w->g->total_workers / 2) { // less than p/2 steal attempts
+			} else if (w->l->locality_steal_attempt < w->g->P / 2) { // less than p/2 steal attempts
 				// randomly pick between higher and lower neighbors
 				if(myrand(w) % 2){
 					n = w->l->higher_neighbor_min_worker + n;
@@ -947,7 +947,7 @@ static void random_steal(__cilkrts_worker *w)
 					n = w->l->lower_neighbor_min_worker + n;
 				}
 			} else { // less than p steal attempts
-				n = steal_rand % (w->g->total_workers - 1);
+				n = steal_rand % (w->g->P - 1);
 			}
 
 	    	if (n >= w->self)
@@ -2959,11 +2959,9 @@ __cilkrts_worker *make_worker(global_state_t *g,
 
 	// Intitalize locality aware stealing
 	w->l->locality_steal_attempt = 0;
-	w->l->local_min_worker = (w->self / w->g->workers_per_socket) * w->g->workers_per_socket;
+	w->l->local_min_worker = ((int)(self / w->g->workers_per_socket)) * w->g->workers_per_socket;
 	w->l->higher_neighbor_min_worker = (w->l->local_min_worker + w->g->workers_per_socket) % (w->g->workers_per_socket * w->g->num_sockets);
 	w->l->lower_neighbor_min_worker = (w->l->local_min_worker - w->g->workers_per_socket) % (w->g->workers_per_socket * w->g->num_sockets);
-
-
 
     /*w->parallelism_disabled = 0;*/
 
