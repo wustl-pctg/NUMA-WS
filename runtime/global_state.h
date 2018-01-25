@@ -278,9 +278,9 @@ struct global_state_t { /* COMMON_PORTABLE */
     int locality_ratio; // the denominator to determine the regular work stealing likelyhood
 #endif
 #ifdef BIN_METHOD
-    unsigned int local_percent; //This varibale holds the probablity of stealing from the local socket
-    unsigned int neighbor_percent; //This variable holds the probablity of stealing from neighbor sockets
-    unsigned int remote_percent; //This variable holds the probablity of stealing from the most remote socket
+    int local_percent; //This varibale holds the probablity of stealing from the local socket
+    int neighbor_percent; //This variable holds the probablity of stealing from neighbor sockets
+    int remote_percent; //This variable holds the probablity of stealing from the most remote socket
 #endif
 
 };

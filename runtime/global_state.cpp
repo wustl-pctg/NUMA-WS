@@ -536,11 +536,11 @@ global_state_t* cilkg_get_user_settable_values()
         store_int(&g->remote_percent, envstr, 0, 100);
 
     if(g->num_sockets == 1) {
-        printf("WARNING: You are using 1 socket. CILK_REMOTE_PERCENT and CILK_NEIGHBOR_PERCENT is ignored!")
+        printf("WARNING: You are using 1 socket. CILK_REMOTE_PERCENT and CILK_NEIGHBOR_PERCENT is ignored!");
         g->remote_percent = 0;
         g->neighbor_percent = 0;
     } else if (g->num_sockets == 2) {
-        printf("WARNING: You are using 2 sockets. CILK_REMOTE_PERCENT is ignored!")
+        printf("WARNING: You are using 2 sockets. CILK_REMOTE_PERCENT is ignored!");
         g->remote_percent = 0;
     }
 #endif

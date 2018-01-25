@@ -75,6 +75,10 @@ namespace cilk {
  */
 #define CILK_LIBRARY_VERSION 102
 
+/** Locality Type
+ */
+#define BIN_METHOD
+
 #ifdef __cplusplus
 #   include <cassert>
 #else
@@ -379,8 +383,6 @@ typedef struct __cilkrts_pedigree
 } __cilkrts_pedigree;
 
 #endif // __CILKRTS_ABI_VERSION >= 1
-
-#define BIN_METHOD
 
 /// @}
 
