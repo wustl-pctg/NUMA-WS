@@ -505,6 +505,26 @@ global_state_t* cilkg_get_user_settable_values()
         cilkg_user_settable_values_initialized = true;
     }
 
+#ifdef BIN_METHOD
+    // Initialize locality variables
+    g->local_percent = 50;
+    g->neighbor_percent = 33;
+    g->remote_percent = 17;
+
+    //Environment variables for locality
+    if (cilkos_getenv(envstr, sizeof(envstr), "CILK_LOCAL_PERCENT"))
+        // Limit to 0 to 100 percent
+        store_int(&g->locality_ratio, envstr, 0, 100);
+
+    if (cilkos_getenv(envstr, sizeof(envstr), "CILK_NEIGHBOR_PERCENT"))
+        // Limit to 0 to 100 percent
+        store_int(&g->locality_ratio, envstr, 0, 100);
+
+    if (cilkos_getenv(envstr, sizeof(envstr), "CILK_REMOTE_PERCENT"))
+        // Limit to 0 to 100 percent
+        store_int(&g->locality_ratio, envstr, 0, 100);
+#endif
+
 #ifndef BIN_METHOD
     // Initialize locality variables
     g->locality_ratio = 2; // 2 for equal likelyhood
