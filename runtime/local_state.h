@@ -425,6 +425,7 @@ struct local_state  /* COMMON_PORTABLE */
      * the scheduler should only attempt locality steals.
      */
     unsigned int locality_steal_attempt;
+#endif
 
     /**
      * This varibale holds the lowest worker number on the worker's LOCAL socket.
@@ -440,6 +441,13 @@ struct local_state  /* COMMON_PORTABLE */
      * This varibale holds the lowest worker number on the worker's LOWER NEIGHBOR.
      */
     unsigned int lower_neighbor_min_worker;
+
+#ifdef BIN_METHOD
+    /**
+     * This variable holds the the lowest worker number on the worker's MOST REMOTE SOCKET
+     */
+
+     unsigned int remote_neighbor_min_worker;
 #endif
 
 };

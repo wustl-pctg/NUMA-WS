@@ -505,6 +505,17 @@ global_state_t* cilkg_get_user_settable_values()
         cilkg_user_settable_values_initialized = true;
     }
 
+    /**
+     * Locality Global Variables
+     */
+    g->num_sockets = numa_num_configured_nodes(); //set to the total number of nodes on the system
+
+    if (cilkos_getenv(envstr, sizeof(envstr), "CILK_NUM_SOCKETS"))
+        // Limit to no less than 1 and no more than 4
+        store_int(&g->num_sockets, envstr, 1, 4);
+
+    g->workers_per_socket = g->P / g->num_sockets; //set to num cores on each socket
+
 #ifdef BIN_METHOD
     // Initialize locality variables
     g->local_percent = 50;
@@ -514,35 +525,37 @@ global_state_t* cilkg_get_user_settable_values()
     //Environment variables for locality
     if (cilkos_getenv(envstr, sizeof(envstr), "CILK_LOCAL_PERCENT"))
         // Limit to 0 to 100 percent
-        store_int(&g->locality_ratio, envstr, 0, 100);
+        store_int(&g->local_percent, envstr, 0, 100);
 
     if (cilkos_getenv(envstr, sizeof(envstr), "CILK_NEIGHBOR_PERCENT"))
         // Limit to 0 to 100 percent
-        store_int(&g->locality_ratio, envstr, 0, 100);
+        store_int(&g->neighbor_percent, envstr, 0, 100);
 
     if (cilkos_getenv(envstr, sizeof(envstr), "CILK_REMOTE_PERCENT"))
         // Limit to 0 to 100 percent
-        store_int(&g->locality_ratio, envstr, 0, 100);
+        store_int(&g->remote_percent, envstr, 0, 100);
+
+    if(g->num_sockets == 1) {
+        printf("WARNING: You are using 1 socket. CILK_REMOTE_PERCENT and CILK_NEIGHBOR_PERCENT is ignored!")
+        g->remote_percent = 0;
+        g->neighbor_percent = 0;
+    } else if (g->num_sockets == 2) {
+        printf("WARNING: You are using 2 sockets. CILK_REMOTE_PERCENT is ignored!")
+        g->remote_percent = 0;
+    }
 #endif
 
 #ifndef BIN_METHOD
     // Initialize locality variables
     g->locality_ratio = 2; // 2 for equal likelyhood
-    g->num_sockets = numa_num_configured_nodes(); //set to the total number of nodes on the system
 
     // Environment variables for locality
     if (cilkos_getenv(envstr, sizeof(envstr), "CILK_LOCALITY_RATIO"))
         // Limit to no less than 2 (50/50) and no more than 10000
         store_int(&g->locality_ratio, envstr, 2, 10000);
-
-    if (cilkos_getenv(envstr, sizeof(envstr), "CILK_NUM_SOCKETS"))
-        // Limit to no less than 1 and no more than 4
-        store_int(&g->num_sockets, envstr, 1, 4);
-
-    g->workers_per_socket = g->P / g->num_sockets; //set to num cores on each socket
+#endif
 
     return g;
-#endif
 
 }
 

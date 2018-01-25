@@ -898,11 +898,16 @@ static void random_steal(__cilkrts_worker *w)
     __cilkrts_worker *victim = NULL;
     cilk_fiber *fiber = NULL;
     int n;
+	int locality_rand;
+
+#ifdef BIN_METHOD
+	int neighbor_percent_low;
+	int neighbor_percent_high;
+#endif
 
 #ifndef BIN_METHOD
-	int locality_rand;
-    unsigned steal_rand;
 	int locality_flag = 0;
+	unsigned steal_rand;
 #endif
 
     int success = 0;
@@ -921,6 +926,27 @@ static void random_steal(__cilkrts_worker *w)
     /* If there is only one processor work can still be stolen.
        There must be only one worker to prevent stealing. */
     CILK_ASSERT(w->g->total_workers > 1);
+
+#ifdef BIN_METHOD
+		neighbor_percent_low = neighbor_percent >> 1;
+		neighbor_percent_high = neighbor_percent - neighbor_percent_low;
+		locality_rand = (myrand(w) % 100) + 1;
+		n = steal_rand % (w->g->workers_per_socket - 1);
+
+		//fall through the if block to find the right socket to steal from
+		if (locality_rand <= remote_percent) {
+			n = w->l->local_min_worker + n;
+		} else if (locality_rand <= (remote_percent + neighbor_percent_low)) {
+			n = w->l->lower_neighbor_min_worker + n;
+		} else if (locality_rand <= (remote_percent + neighbor_percent_low + neighbor_percent_high))  {
+			n = w->l->higher_neighbor_min_worker + n;
+		} else {
+			n = w->l->remote_neighbor_min_worker + n;
+		}
+
+		if (n >= w->self)
+			++n;
+#endif
 
 #ifndef BIN_METHOD
 		locality_rand = myrand(w) % w->g->locality_ratio;
@@ -2971,9 +2997,15 @@ __cilkrts_worker *make_worker(global_state_t *g,
 #ifndef BIN_METHOD
 	// Intitalize locality aware stealing
 	w->l->locality_steal_attempt = 0;
+#endif
 	w->l->local_min_worker = ((int)(self / w->g->workers_per_socket)) * w->g->workers_per_socket;
+
 	w->l->higher_neighbor_min_worker = (w->l->local_min_worker + w->g->workers_per_socket) % (w->g->workers_per_socket * w->g->num_sockets);
+
 	w->l->lower_neighbor_min_worker = (w->l->local_min_worker - w->g->workers_per_socket) % (w->g->workers_per_socket * w->g->num_sockets);
+
+#ifdef BIN_METHOD
+	w->l->remote_neighbor_min_worker = (w->l->higher_neighbor_min_worker + w->g->workers_per_socket) % (w->g->workers_per_socket * w->g->num_sockets);
 #endif
 
 	/*w->parallelism_disabled = 0;*/

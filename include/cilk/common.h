@@ -2,11 +2,11 @@
  *
  *  Copyright (C) 2010-2015, Intel Corporation
  *  All rights reserved.
- *  
+ *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted provided that the following conditions
  *  are met:
- *  
+ *
  *    * Redistributions of source code must retain the above copyright
  *      notice, this list of conditions and the following disclaimer.
  *    * Redistributions in binary form must reproduce the above copyright
@@ -16,7 +16,7 @@
  *    * Neither the name of Intel Corporation nor the names of its
  *      contributors may be used to endorse or promote products derived
  *      from this software without specific prior written permission.
- *  
+ *
  *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -29,9 +29,9 @@
  *  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY
  *  WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
- *  
+ *
  *  *********************************************************************
- *  
+ *
  *  PLEASE NOTE: This file is a downstream copy of a file mainitained in
  *  a repository at cilkplus.org. Changes made to this file that are not
  *  submitted through the contribution process detailed at
@@ -40,11 +40,11 @@
  *  GNU compiler collection or posted to the git repository at
  *  https://bitbucket.org/intelcilkplusruntime/itnel-cilk-runtime.git are
  *  not tracked.
- *  
+ *
  *  We welcome your contributions to this open source project. Thank you
  *  for your assistance in helping us improve Cilk Plus.
  */
- 
+
 /** @file common.h
  *
  * @brief Defines common macros and structures used by the Intel(R) Cilk(TM) Plus runtime.
@@ -56,7 +56,7 @@
  *  Definitions for runtime macros, structures, and classes.
  *  @{
  */
- 
+
 #ifndef INCLUDED_CILK_COMMON
 #define INCLUDED_CILK_COMMON
 
@@ -64,7 +64,7 @@
 /** Namespace for all Intel Cilk Plus definitions that can be included in user code.
  */
 namespace cilk {
-    
+
     /** Namespace for definitions re-used in other Intel Cilk Plus definitions.
      */
     namespace internal {}
@@ -151,7 +151,7 @@ namespace cilk {
 /**
  * OS-independent macro to specify a function which is known to not throw
  * an exception.
- */ 
+ */
 #ifdef __cplusplus
 #   ifdef _WIN32
 #       define __CILKRTS_NOTHROW __declspec(nothrow)
@@ -184,7 +184,7 @@ namespace cilk {
 
 /**
  * Macro to specify a class as being at least as strictly aligned as some
- * type on Windows. gcc does not provide a way of doing this, so on Unix, 
+ * type on Windows. gcc does not provide a way of doing this, so on Unix,
  * this just specifies the largest natural type alignment. Put the macro
  * between the `class` keyword and the class name:
  *
@@ -321,7 +321,7 @@ namespace cilk {
  * The compiler determines the ABI version used for compilation.  Object files
  * compiled with higher ABI versions are not compatible with libraries compiled
  * with lower ABI versions.  However, an object file compiled with a lower ABI
- * version can be used with a library compiled with a higher ABI version 
+ * version can be used with a library compiled with a higher ABI version
  * (unless otherwise stated.)
  */
 #ifndef __CILKRTS_ABI_VERSION
@@ -338,7 +338,7 @@ namespace cilk {
 
 // These structs are exported because the inlining of
 // the internal version of API methods require a worker
-// structure as parameter. 
+// structure as parameter.
 __CILKRTS_BEGIN_EXTERN_C
     /// Worker struct, exported for inlined API methods
     /// @ingroup api
@@ -346,13 +346,13 @@ __CILKRTS_BEGIN_EXTERN_C
 
     /// Worker struct, exported for inlined API methods
     /// @ingroup api
-    typedef struct __cilkrts_worker __cilkrts_worker;     
+    typedef struct __cilkrts_worker __cilkrts_worker;
 
     /// Worker struct pointer, exported for inlined API methods
     /// @ingroup api
-    typedef struct __cilkrts_worker *__cilkrts_worker_ptr; 
-    
-    
+    typedef struct __cilkrts_worker *__cilkrts_worker_ptr;
+
+
     /// Fetch the worker out of TLS.
     CILK_ABI(__cilkrts_worker_ptr) __cilkrts_get_tls_worker(void);
 
@@ -362,7 +362,7 @@ __CILKRTS_BEGIN_EXTERN_C
 
 __CILKRTS_END_EXTERN_C
 
-                                   
+
 #if __CILKRTS_ABI_VERSION >= 1
 // Pedigree API is available only for compilers that use ABI version >= 1.
 
@@ -373,12 +373,14 @@ typedef struct __cilkrts_pedigree
 {
     /** Rank at start of spawn helper. Saved rank for spawning functions */
     uint64_t rank;
-                                         
+
     /** Link to next in chain */
     const struct __cilkrts_pedigree *parent;
 } __cilkrts_pedigree;
 
 #endif // __CILKRTS_ABI_VERSION >= 1
+
+#define BIN_METHOD
 
 /// @}
 
