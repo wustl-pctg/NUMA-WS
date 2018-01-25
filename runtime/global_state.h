@@ -268,6 +268,7 @@ struct global_state_t { /* COMMON_PORTABLE */
     int P;         ///< USER SETTING: number of system workers + 1 (fixed)
     int Q;         ///< Number of user threads currently bound to workers
 
+#ifndef BIN_METHOD
     /**
      * The below secion contains the global varaibles for the parameters of the
      * locality stealing.
@@ -276,6 +277,8 @@ struct global_state_t { /* COMMON_PORTABLE */
     int locality_ratio; // the denominator to determine the regular work stealing likelyhood
     int num_sockets; // the number of sockets used in the computation
     int workers_per_socket; // the number of workers on each socket
+#endif
+
 };
 
 /**

@@ -898,9 +898,13 @@ static void random_steal(__cilkrts_worker *w)
     __cilkrts_worker *victim = NULL;
     cilk_fiber *fiber = NULL;
     int n;
+
+#ifndef BIN_METHOD
 	int locality_rand;
     unsigned steal_rand;
 	int locality_flag = 0;
+#endif
+
     int success = 0;
     int32_t victim_id;
 
@@ -917,7 +921,8 @@ static void random_steal(__cilkrts_worker *w)
     /* If there is only one processor work can still be stolen.
        There must be only one worker to prevent stealing. */
     CILK_ASSERT(w->g->total_workers > 1);
-        
+
+#ifndef BIN_METHOD
 		locality_rand = myrand(w) % w->g->locality_ratio;
 
 		steal_rand = myrand(w);
@@ -953,6 +958,7 @@ static void random_steal(__cilkrts_worker *w)
 	    	if (n >= w->self)
 	    		++n;
 		}
+#endif
 
     // If we're replaying a log, override the victim.  -1 indicates that
     // we've exhausted the list of things this worker stole when we recorded
@@ -1068,8 +1074,10 @@ static void random_steal(__cilkrts_worker *w)
     w->l->work_stolen = success;
 
     if (0 == success) {
+#ifndef BIN_METHOD
         //fail to steal work on locality steal, add 1 to counter
         if(locality_flag) w->l->locality_steal_attempt++;
+#endif
 
         // failed to steal work.  Return the fiber to the pool.
         START_INTERVAL(w, INTERVAL_FIBER_DEALLOCATE) {
@@ -1082,9 +1090,12 @@ static void random_steal(__cilkrts_worker *w)
     }
     else
     {
+
+#ifndef BIN_METHOD
         // If sucess on steal attempt, reset counter.
 		// On any sucess, the locality steal will start over at p/4
         w->l->locality_steal_attempt = 0;
+#endif
 
         // Since our steal was successful, finish initialization of
         // the fiber.
@@ -2957,13 +2968,15 @@ __cilkrts_worker *make_worker(global_state_t *g,
     // Nothing's been stolen yet
     w->l->worker_magic_1 = WORKER_MAGIC_1;
 
+#ifndef BIN_METHOD
 	// Intitalize locality aware stealing
 	w->l->locality_steal_attempt = 0;
 	w->l->local_min_worker = ((int)(self / w->g->workers_per_socket)) * w->g->workers_per_socket;
 	w->l->higher_neighbor_min_worker = (w->l->local_min_worker + w->g->workers_per_socket) % (w->g->workers_per_socket * w->g->num_sockets);
 	w->l->lower_neighbor_min_worker = (w->l->local_min_worker - w->g->workers_per_socket) % (w->g->workers_per_socket * w->g->num_sockets);
+#endif
 
-    /*w->parallelism_disabled = 0;*/
+	/*w->parallelism_disabled = 0;*/
 
     // Allow stealing all frames. Sets w->saved_protected_tail
     __cilkrts_restore_stealing(w, w->ltq_limit);

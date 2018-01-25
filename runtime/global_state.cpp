@@ -505,6 +505,7 @@ global_state_t* cilkg_get_user_settable_values()
         cilkg_user_settable_values_initialized = true;
     }
 
+#ifndef BIN_METHOD
     // Initialize locality variables
     g->locality_ratio = 2; // 2 for equal likelyhood
     g->num_sockets = numa_num_configured_nodes(); //set to the total number of nodes on the system
@@ -521,6 +522,8 @@ global_state_t* cilkg_get_user_settable_values()
     g->workers_per_socket = g->P / g->num_sockets; //set to num cores on each socket
 
     return g;
+#endif
+
 }
 
 int cilkg_calc_total_workers()

@@ -419,6 +419,7 @@ struct local_state  /* COMMON_PORTABLE */
      */
     ls_magic_t worker_magic_1;
 
+#ifndef BIN_METHOD
     /**
      * This variable holds the number of locality failed steals. If it's non-zero
      * the scheduler should only attempt locality steals.
@@ -439,6 +440,8 @@ struct local_state  /* COMMON_PORTABLE */
      * This varibale holds the lowest worker number on the worker's LOWER NEIGHBOR.
      */
     unsigned int lower_neighbor_min_worker;
+#endif
+
 };
 
 /**
