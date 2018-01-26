@@ -75,9 +75,10 @@ namespace cilk {
  */
 #define CILK_LIBRARY_VERSION 102
 
-/** Locality Type
+/** Locality Defines
  */
 #define BIN_METHOD
+#define CORES_PER_SOCKET 8 
 
 #ifdef __cplusplus
 #   include <cassert>

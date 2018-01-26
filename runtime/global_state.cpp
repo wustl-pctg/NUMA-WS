@@ -449,13 +449,6 @@ global_state_t* cilkg_get_user_settable_values()
         else if (cilkos_getenv(envstr, sizeof(envstr), "CILK_FORCE_REDUCE"))
             store_bool(&g->force_reduce, envstr);
 
-        if (under_ptool)
-            g->P = 1;  // Ignore environment variable if under cilkscreen
-        else if (cilkos_getenv(envstr, sizeof(envstr), "CILK_NWORKERS"))
-            // Set P to environment variable, but limit to no less than 1
-            // and no more than 16 times the number of hardware threads.
-            store_int(&g->P, envstr, 1, 16 * hardware_cpu_count);
-
         if (cilkos_getenv(envstr, sizeof(envstr), "CILK_MAX_USER_WORKERS"))
             // Set max_user_workers to environment variable, but limit to no
             // less than 1 and no more 16 times the number of hardware
@@ -508,13 +501,20 @@ global_state_t* cilkg_get_user_settable_values()
     /**
      * Locality Global Variables
      */
-    g->num_sockets = numa_num_configured_nodes(); //set to the total number of nodes on the system
+    g->num_sockets = 4; // assume 4 socket machine
+    g->workers_per_socket = 8; // assume 8 cores per socket 
 
     if (cilkos_getenv(envstr, sizeof(envstr), "CILK_NUM_SOCKETS"))
         // Limit to no less than 1 and no more than 4
         store_int(&g->num_sockets, envstr, 1, 4);
 
-    g->workers_per_socket = g->P / g->num_sockets; //set to num cores on each socket
+    if (cilkos_getenv(envstr, sizeof(envstr), "CILK_WORKERS_PER_SOCKET"))
+        // Limit to no less than 1 and no more than 4
+        store_int(&g->workers_per_socket, envstr, 1, 8);
+
+    //set the number of workers now
+    g->P = g->num_sockets * g->workers_per_socket;
+
 
 #ifdef BIN_METHOD
     // Initialize locality variables
@@ -536,11 +536,11 @@ global_state_t* cilkg_get_user_settable_values()
         store_int(&g->remote_percent, envstr, 0, 100);
 
     if(g->num_sockets == 1) {
-        printf("WARNING: You are using 1 socket. CILK_REMOTE_PERCENT and CILK_NEIGHBOR_PERCENT is ignored!");
+        printf("WARNING: You are using 1 socket. CILK_REMOTE_PERCENT and CILK_NEIGHBOR_PERCENT is ignored!\n");
         g->remote_percent = 0;
         g->neighbor_percent = 0;
     } else if (g->num_sockets == 2) {
-        printf("WARNING: You are using 2 sockets. CILK_REMOTE_PERCENT is ignored!");
+        printf("WARNING: You are using 2 sockets. CILK_REMOTE_PERCENT is ignored!\n");
         g->remote_percent = 0;
     }
 #endif

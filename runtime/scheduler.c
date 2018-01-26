@@ -927,26 +927,34 @@ static void random_steal(__cilkrts_worker *w)
        There must be only one worker to prevent stealing. */
     CILK_ASSERT(w->g->total_workers > 1);
 
+    /**
+     * IMPORTANT: Victim number is not the same as the core number!
+     */
 #ifdef BIN_METHOD
 		neighbor_percent_low = w->g->neighbor_percent >> 1;
 		neighbor_percent_high = w->g->neighbor_percent - neighbor_percent_low;
 		locality_rand = (myrand(w) % 100) + 1;
 
-		n = myrand(w) % (w->g->workers_per_socket - 1);
+        if(w->g->workers_per_socket == 1){
+            n = 0;
+        } else {
+		    n = myrand(w) % (w->g->workers_per_socket - 1);
+        }
 
 		//fall through the if block to find the right socket to steal from
-		if (locality_rand <= w->g->remote_percent) {
+		if (w->g->remote_percent && locality_rand <= w->g->remote_percent) {
 			n = w->l->remote_neighbor_min_worker + n;
-		} else if (locality_rand <= (w->g->remote_percent + neighbor_percent_low)) {
+		} else if (w->g->neighbor_percent && locality_rand <= (w->g->remote_percent + neighbor_percent_low)) {
 			n = w->l->lower_neighbor_min_worker + n;
-		} else if (locality_rand <= (w->g->remote_percent + neighbor_percent_low + neighbor_percent_high))  {
+		} else if (w->g->neighbor_percent && locality_rand <= (w->g->remote_percent + neighbor_percent_low + neighbor_percent_high))  {
 			n = w->l->higher_neighbor_min_worker + n;
 		} else {
 			n = w->l->local_min_worker + n;
 		}
 
 		if (n >= w->self)
-			++n;
+            ++n;
+
 #endif
 
 #ifndef BIN_METHOD
