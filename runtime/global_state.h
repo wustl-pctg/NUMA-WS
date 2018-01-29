@@ -283,6 +283,13 @@ struct global_state_t { /* COMMON_PORTABLE */
     int remote_percent; //This variable holds the probablity of stealing from the most remote socket
 #endif
 
+    /**
+     * @brief TRUE when workers should steal only from its own socket 
+     * It should be set infrequently but read frequently.  
+     * Separately from other read-only fields.
+     */
+    char cache_buf_3[64];
+    volatile int disable_nonlocal_steal;
 };
 
 /**

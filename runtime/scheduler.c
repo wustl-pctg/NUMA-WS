@@ -107,7 +107,7 @@ extern __attribute__((noreturn))
 		void longjmp(jmp_buf, int);
 #endif
 
-#define DEBUG_LOCKS 1
+#define DEBUG_LOCKS 0
 #ifdef DEBUG_LOCKS
 // The currently executing worker must own this worker's lock
 #   define ASSERT_WORKER_LOCK_OWNED(w) \
@@ -447,6 +447,7 @@ void __cilkrts_push_next_frame(__cilkrts_worker *w, full_frame *ff)
 static void transfer_next_frame(__cilkrts_worker *w, __cilkrts_worker *target) {
     ASSERT_WORKER_LOCK_OWNED(w);
     ASSERT_WORKER_LOCK_OWNED(target);
+    CILK_ASSERT(w->l->next_frame_ff->call_stack);
     CILK_ASSERT(w->l->next_frame_ff);
     CILK_ASSERT(!target->l->next_frame_ff);
     target->l->next_frame_ff = w->l->next_frame_ff;
@@ -750,6 +751,81 @@ static full_frame *unroll_call_stack(__cilkrts_worker *w,
 }
 
 /**
+ * @brief cilk_fiber_proc that resumes user code after a successful
+ * random steal.
+
+ * This function longjmps back into the user code whose state is
+ * stored in cilk_fiber_get_data(fiber)->resume_sf.  The stack pointer
+ * is adjusted so that the code resumes on the specified fiber stack
+ * instead of its original stack.
+ *
+ * This method gets executed only on a fiber freshly allocated from a
+ * pool.
+ *
+ * @param fiber   The fiber being used to resume user code.
+ * @param arg     Unused.
+ */
+static
+void fiber_proc_to_resume_user_code_for_random_steal(cilk_fiber *fiber)
+{
+    cilk_fiber_data *data = cilk_fiber_get_data(fiber);
+    __cilkrts_stack_frame* sf = data->resume_sf;
+    full_frame *ff;
+
+    CILK_ASSERT(sf);
+
+    // When we pull the resume_sf out of the fiber to resume it, clear
+    // the old value.
+    data->resume_sf = NULL;
+    CILK_ASSERT(sf->worker == data->owner);
+    ff = sf->worker->l->frame_ff;
+
+    // For Win32, we need to overwrite the default exception handler
+    // in this function, so that when the OS exception handling code
+    // walks off the top of the current Cilk stack, it reaches our stub
+    // handler.
+
+    // Also, this function needs to be wrapped into a try-catch block
+    // so the compiler generates the appropriate exception information
+    // in this frame.
+
+    // TBD: IS THIS HANDLER IN THE WRONG PLACE?  Can we longjmp out of
+    // this function (and does it matter?)
+#if defined(_WIN32) && !defined(_WIN64)
+    install_exception_stub_handler();
+    __try
+#endif
+    {
+        char* new_sp = sysdep_reset_jump_buffers_for_resume(fiber, ff, sf);
+
+        // Notify the Intel tools that we're stealing code
+        ITT_SYNC_ACQUIRED(sf->worker);
+        NOTIFY_ZC_INTRINSIC("cilk_continue", sf);
+
+        // TBD: We'd like to move TBB-interop methods into the fiber
+        // eventually.
+        cilk_fiber_invoke_tbb_stack_op(fiber, CILK_TBB_STACK_ADOPT);
+
+        sf->flags &= ~CILK_FRAME_SUSPENDED;
+
+        // longjmp to user code.  Don't process exceptions here,
+        // because we are resuming a stolen frame.
+        sysdep_longjmp_to_sf(new_sp, sf, NULL);
+        /*NOTREACHED*/
+        // Intel's C compiler respects the preceding lint pragma
+    }
+#if defined(_WIN32) && !defined(_WIN64)
+    __except (CILK_ASSERT(!"should not execute the the stub filter"),
+              EXCEPTION_EXECUTE_HANDLER)
+    {
+        // If we are here, that means something very wrong
+        // has happened in our exception processing...
+        CILK_ASSERT(! "should not be here!");
+    }
+#endif
+}
+
+/**
  * Added for locality: This function is only used in two places:
  * 1) when worker w stole successfully from a victim (== w_locked), but the 
  * stolen frame is marked with a designated socket, so we need to randomly 
@@ -770,6 +846,7 @@ static __cilkrts_worker *pick_random_worker_on_socket(__cilkrts_worker *w,
     // assert: lock on w is not held but lock on w_locked is if w_locked != NULL
     ASSERT_WORKER_LOCK_OWNED(w);
     CILK_ASSERT(w->l->my_socket_id != socket_id);
+    socket_id = socket_id % w->g->num_sockets;
 
     __cilkrts_worker *picked_w = NULL;
 
@@ -805,13 +882,14 @@ static __cilkrts_worker *pick_random_worker_on_socket(__cilkrts_worker *w,
  * designated socket.  If so, find a worker on the designated socket and push
  * the frame to it.  
  *
- * Return 0 if this worker still owns frame ff
- * Return 1 if the frame is pushed onto a different worker
+ * Return the worker who got the frame; could be the original w or a randomly 
+ * selected worker on the designated socket.
  **/ 
-static int check_frame_for_designated_socket(__cilkrts_worker *w, full_frame *ff) {
+static __cilkrts_worker *
+check_frame_for_designated_socket(__cilkrts_worker *w, full_frame *ff) {
 
     ASSERT_WORKER_LOCK_OWNED(w);
-    CILK_ASSERT(w->l->next_frame_ff == ff);
+    CILK_ASSERT(ff && w->l->next_frame_ff == ff);
 
     __cilkrts_stack_frame *sf = w->l->next_frame_ff->call_stack;
 
@@ -825,14 +903,26 @@ static int check_frame_for_designated_socket(__cilkrts_worker *w, full_frame *ff
         if(w->l->my_socket_id != socket_id) {
             __cilkrts_worker *w_to_push = 
                 pick_random_worker_on_socket(w, socket_id);
+            cilk_fiber *fiber = NULL;
             transfer_next_frame(w, w_to_push);
+            // came from random steal path; allocate a fiber before pushing the frame
+            if(ff->fiber_self == NULL) { 
+                START_INTERVAL(w, INTERVAL_FIBER_ALLOCATE) {
+                    // Verify that we can get a stack.  If not, no need to continue. 
+                    fiber = cilk_fiber_allocate(&w_to_push->l->fiber_pool);
+                } STOP_INTERVAL(w, INTERVAL_FIBER_ALLOCATE);
+                CILK_ASSERT(fiber);
+                ff->fiber_self = fiber;
+                cilk_fiber_reset_state(fiber, fiber_proc_to_resume_user_code_for_random_steal);
+                w_to_push->l->team = w->l->team;
+                w->l->team = NULL;
+            }
             worker_unlock_other(w, w_to_push);
-
-            return 1;
+            return w_to_push;
         }
     }
 
-    return 0;
+    return w;
 }
 
 static void check_frame_for_sync_master(__cilkrts_worker *w, full_frame *ff) {
@@ -852,7 +942,8 @@ static void check_frame_for_sync_master(__cilkrts_worker *w, full_frame *ff) {
 
         unset_sync_master(w->l->team, ff);
         if(w->l->team != w) {
-            while(worker_trylock_other(w, w->l->team)==0);
+            while(worker_trylock_other(w, w->l->team)==0) 
+                ; // spin-wit until lock acquire; should be rare
             ASSERT_WORKER_LOCK_OWNED(w->l->team);
             transfer_next_frame(w, w->l->team);
             worker_unlock_other(w, w->l->team);
@@ -974,98 +1065,14 @@ static void detach_for_steal(__cilkrts_worker *w,
     return;
 }
 
-/**
- * @brief cilk_fiber_proc that resumes user code after a successful
- * random steal.
-
- * This function longjmps back into the user code whose state is
- * stored in cilk_fiber_get_data(fiber)->resume_sf.  The stack pointer
- * is adjusted so that the code resumes on the specified fiber stack
- * instead of its original stack.
- *
- * This method gets executed only on a fiber freshly allocated from a
- * pool.
- *
- * @param fiber   The fiber being used to resume user code.
- * @param arg     Unused.
- */
-static
-void fiber_proc_to_resume_user_code_for_random_steal(cilk_fiber *fiber)
-{
-    cilk_fiber_data *data = cilk_fiber_get_data(fiber);
-    __cilkrts_stack_frame* sf = data->resume_sf;
-    full_frame *ff;
-
-    CILK_ASSERT(sf);
-
-    // When we pull the resume_sf out of the fiber to resume it, clear
-    // the old value.
-    data->resume_sf = NULL;
-    CILK_ASSERT(sf->worker == data->owner);
-    ff = sf->worker->l->frame_ff;
-
-    // For Win32, we need to overwrite the default exception handler
-    // in this function, so that when the OS exception handling code
-    // walks off the top of the current Cilk stack, it reaches our stub
-    // handler.
-
-    // Also, this function needs to be wrapped into a try-catch block
-    // so the compiler generates the appropriate exception information
-    // in this frame.
-
-    // TBD: IS THIS HANDLER IN THE WRONG PLACE?  Can we longjmp out of
-    // this function (and does it matter?)
-#if defined(_WIN32) && !defined(_WIN64)
-    install_exception_stub_handler();
-    __try
-#endif
-    {
-        char* new_sp = sysdep_reset_jump_buffers_for_resume(fiber, ff, sf);
-
-        // Notify the Intel tools that we're stealing code
-        ITT_SYNC_ACQUIRED(sf->worker);
-        NOTIFY_ZC_INTRINSIC("cilk_continue", sf);
-
-        // TBD: We'd like to move TBB-interop methods into the fiber
-        // eventually.
-        cilk_fiber_invoke_tbb_stack_op(fiber, CILK_TBB_STACK_ADOPT);
-
-        sf->flags &= ~CILK_FRAME_SUSPENDED;
-
-        // longjmp to user code.  Don't process exceptions here,
-        // because we are resuming a stolen frame.
-        sysdep_longjmp_to_sf(new_sp, sf, NULL);
-        /*NOTREACHED*/
-        // Intel's C compiler respects the preceding lint pragma
-    }
-#if defined(_WIN32) && !defined(_WIN64)
-    __except (CILK_ASSERT(!"should not execute the the stub filter"),
-              EXCEPTION_EXECUTE_HANDLER)
-    {
-        // If we are here, that means something very wrong
-        // has happened in our exception processing...
-        CILK_ASSERT(! "should not be here!");
-    }
-#endif
-}
-
 static void random_steal(__cilkrts_worker *w)
 {
     __cilkrts_worker *victim = NULL;
-    cilk_fiber *fiber = NULL;
+    // use a place holder for now and create the fiber after we figure out
+    // who actually gets the frame
+    cilk_fiber *fiber = PLACEHOLDER_FIBER; 
+
     int n;
-	int locality_rand;
-
-#ifdef BIN_METHOD
-	int neighbor_percent_low;
-	int neighbor_percent_high;
-#endif
-
-#ifndef BIN_METHOD
-    unsigned steal_rand;
-	int locality_flag = 0;
-#endif
-
     int success = 0;
     int32_t victim_id;
 
@@ -1086,69 +1093,76 @@ static void random_steal(__cilkrts_worker *w)
     /**
      * IMPORTANT: Victim number is not the same as the core number!
      */
+    int disable_nonlocal_steal = w->g->disable_nonlocal_steal;
+
 #ifdef BIN_METHOD
-		neighbor_percent_low = w->g->neighbor_percent >> 1;
-		neighbor_percent_high = w->g->neighbor_percent - neighbor_percent_low;
-		locality_rand = (myrand(w) % 100) + 1;
+    // ANGE XXX: but right now neighbor_percent is not divisible by 2, so we lose sth
+    // ANGE XXX: also, as written, what if the percents don't add up to 100?
+    // ANGE XXX: it would skewed towards stealing from local socket 
+    // ANGE XXX: we never used local_percent
+    int neighbor_percent_half = w->g->neighbor_percent >> 1;
+    int sum = w->g->local_percent + w->g->neighbor_percent + w->g->remote_percent;
+    int locality_rand = myrand(w) % sum;
+    int socket_offset = 0;
 
-        if(w->g->workers_per_socket == 1){
-            n = 0;
-        } else {
-		    n = myrand(w) % (w->g->workers_per_socket - 1);
+    //fall through the if block to find the right socket to steal from
+    if (locality_rand < w->g->local_percent || disable_nonlocal_steal) {
+        if(w->g->workers_per_socket > 1) {
+            socket_offset = myrand(w) % (w->g->workers_per_socket - 1);
+        } else { // only one worker per socket; fail in this case 
+            return; 
         }
+        n = w->l->local_min_worker + socket_offset;
+        if (n >= w->self) { ++n; }
+    } else {
+        // ANGE XXX: don't do the -1 in this case
+        if(w->g->workers_per_socket > 1) {
+            socket_offset = myrand(w) % (w->g->workers_per_socket);
+        }
+        if (locality_rand < (w->g->local_percent + neighbor_percent_half)) {
+            n = w->l->lower_neighbor_min_worker + socket_offset;
+        } else if (locality_rand < (w->g->local_percent + w->g->neighbor_percent))  {
+            n = w->l->higher_neighbor_min_worker + socket_offset;
+        } else {
+            n = w->l->remote_neighbor_min_worker + socket_offset;
+        }
+    }
 
-		//fall through the if block to find the right socket to steal from
-		if (w->g->remote_percent && locality_rand <= w->g->remote_percent) {
-			n = w->l->remote_neighbor_min_worker + n;
-		} else if (w->g->neighbor_percent && locality_rand <= (w->g->remote_percent + neighbor_percent_low)) {
-			n = w->l->lower_neighbor_min_worker + n;
-		} else if (w->g->neighbor_percent && locality_rand <= (w->g->remote_percent + neighbor_percent_low + neighbor_percent_high))  {
-			n = w->l->higher_neighbor_min_worker + n;
-		} else {
-			n = w->l->local_min_worker + n;
-		}
+#else // ifndef BIN_METHOD
+    int locality_flag = 0;
+    // select which type of stealing to do
+    // ANGE XXX: non-locality to locality: 1-to-k ratio, need 0 ... k 
+    int locality_rand = myrand(w) % (w->g->locality_ratio + 1);
+    unsigned int steal_rand = myrand(w);
 
-		if (n >= w->self)
-            ++n;
+    /* pick random *other* victim to begin with */
+    n = steal_rand % (w->g->P - 1);
+    if (n >= w->self) { ++n; }
 
-#endif
+    if(locality_rand != 0 || disable_nonlocal_steal) { // if try locality aware steal, update n
+        locality_flag = 1;
+        int socket_offset = 0;
 
-#ifndef BIN_METHOD
-		locality_rand = myrand(w) % w->g->locality_ratio;
-
-		steal_rand = myrand(w);
-		//select which type of stealing to do
-		if(locality_rand == 0) { //do completely random steal if zero
-      		//printf("Random Steal\n");
-			/* pick random *other* victim */
-	        n = steal_rand % (w->g->P - 1);
-	        if (n >= w->self)
-	            ++n;
-		} else { //in all other cases try locality aware steal
-			locality_flag = 1;
-			/* pick random *other* victim */
-	    	n = steal_rand % (w->g->workers_per_socket -1); //mod # of cores per socket
-
-			/* Use different steal attempts based on previous failed attempts.
-			 * This starts over at p/4 on ANY success.
-			 */
-			if(w->l->locality_steal_attempt < w->g->P / 4) // less than p/4 steal attempts
-			{
-				n = w->l->local_min_worker + n;
-			} else if (w->l->locality_steal_attempt < w->g->P / 2) { // less than p/2 steal attempts
-				// randomly pick between higher and lower neighbors
-				if(myrand(w) % 2){
-					n = w->l->higher_neighbor_min_worker + n;
-				} else {
-					n = w->l->lower_neighbor_min_worker + n;
-				}
-			} else { // less than p steal attempts
-				n = steal_rand % (w->g->P - 1);
-			}
-
-	    	if (n >= w->self)
-	    		++n;
-		}
+        /* Use different steal attempts based on previous failed attempts.
+         * This starts over at p/4 on ANY success.
+         */
+        if(w->l->locality_steal_attempt < (w->g->P/4) // less than p/4 steal attempts
+           || disable_nonlocal_steal) { // or nonlocal steal disabled
+            /* pick random *other* victim */
+            socket_offset = steal_rand % (w->g->workers_per_socket-1); //mod # of cores per socket
+            n = w->l->local_min_worker + socket_offset;
+            if(n >= w->self) { ++n; }
+        } else if (w->l->locality_steal_attempt < (w->g->P/2)) { // less than p/2 steal attempts
+            socket_offset = steal_rand % (w->g->workers_per_socket << 1); //mod # of cores per socket
+            // randomly pick between higher and lower neighbors
+            if(socket_offset < w->g->workers_per_socket) {
+                n = w->l->lower_neighbor_min_worker + socket_offset;
+            } else {
+                n = w->l->higher_neighbor_min_worker + socket_offset;
+            }
+        }
+        // less than P/4 + P/2 steal attempts will fall through and used the random n
+    }
 #endif
 
     // If we're replaying a log, override the victim.  -1 indicates that
@@ -1161,20 +1175,6 @@ static void random_steal(__cilkrts_worker *w)
 
     victim = w->g->workers[n];
 
-    START_INTERVAL(w, INTERVAL_FIBER_ALLOCATE) {
-        /* Verify that we can get a stack.  If not, no need to continue. */
-        fiber = cilk_fiber_allocate(&w->l->fiber_pool);
-    } STOP_INTERVAL(w, INTERVAL_FIBER_ALLOCATE);
-
-
-    if (NULL == fiber) {
-#if FIBER_DEBUG >= 2
-        fprintf(stderr, "w=%d: failed steal because we could not get a fiber\n",
-                w->self);
-#endif
-        return;
-    }
-
     /* do not steal from self */
     CILK_ASSERT (victim != w);
 
@@ -1182,12 +1182,6 @@ static void random_steal(__cilkrts_worker *w)
        Avoid grabbing locks if there is nothing to steal. */
     if (!can_steal_from(victim)) {
         NOTE_INTERVAL(w, INTERVAL_STEAL_FAIL_EMPTYQ);
-        START_INTERVAL(w, INTERVAL_FIBER_DEALLOCATE) {
-            int ref_count = cilk_fiber_remove_reference(fiber, &w->l->fiber_pool);
-            // Fibers we use when trying to steal should not be active,
-            // and thus should not have any other references.
-            CILK_ASSERT(0 == ref_count);
-        } STOP_INTERVAL(w, INTERVAL_FIBER_DEALLOCATE);
         return;
     }
 
@@ -1217,17 +1211,14 @@ static void random_steal(__cilkrts_worker *w)
 
                 // If we're replaying a log, verify that this the correct frame
                 // to steal from the victim
-                if (! replay_match_victim_pedigree(w, victim))
-                {
-                    // Abort the steal attempt. decrement_E(victim) to
-                    // counter the increment_E(victim) done by the
-                    // dekker protocol
+                if (! replay_match_victim_pedigree(w, victim)) {
+                    // Abort the steal attempt. decrement_E(victim) to counter
+                    // the increment_E(victim) done by the dekker protocol
                     decrement_E(victim);
                     proceed_with_steal = 0;
                 }
 
-                if (proceed_with_steal)
-                {
+                if (proceed_with_steal) {
                     START_INTERVAL(w, INTERVAL_STEAL_SUCCESS) {
                         success = 1;
                         detach_for_steal(w, victim, fiber);
@@ -1249,21 +1240,25 @@ static void random_steal(__cilkrts_worker *w)
                             w->l->next_frame_ff->call_stack->call_parent);
                     } STOP_INTERVAL(w, INTERVAL_STEAL_SUCCESS);
                 }  // end if(proceed_with_steal)
-            } else {
-                NOTE_INTERVAL(w, INTERVAL_STEAL_FAIL_DEKKER);
-            }
-        } else {
-            NOTE_INTERVAL(w, INTERVAL_STEAL_FAIL_EMPTYQ);
-        }
+            } else { NOTE_INTERVAL(w, INTERVAL_STEAL_FAIL_DEKKER); }
+        } else { NOTE_INTERVAL(w, INTERVAL_STEAL_FAIL_EMPTYQ); }
         worker_unlock_other(w, victim);
-    } else {
-        NOTE_INTERVAL(w, INTERVAL_STEAL_FAIL_LOCK);
-    }
+    } else { NOTE_INTERVAL(w, INTERVAL_STEAL_FAIL_LOCK); }
     
     if(success) {
+        __cilkrts_worker *owner_w;
         BEGIN_WITH_WORKER_LOCK(w) {
             // check_frame_for_desig_socket returns 1 if pushed to other worker
-            success = !(check_frame_for_designated_socket(w, w->l->next_frame_ff));
+            owner_w = check_frame_for_designated_socket(w, w->l->next_frame_ff);
+            if(owner_w == w) {
+                START_INTERVAL(w, INTERVAL_FIBER_ALLOCATE) {
+                    // Verify that we can get a stack.  If not, no need to continue. 
+                    fiber = cilk_fiber_allocate(&w->l->fiber_pool);
+                } STOP_INTERVAL(w, INTERVAL_FIBER_ALLOCATE);
+                CILK_ASSERT(w->l->next_frame_ff && fiber);
+                w->l->next_frame_ff->fiber_self = fiber;
+                cilk_fiber_reset_state(fiber, fiber_proc_to_resume_user_code_for_random_steal);
+            }
         } END_WITH_WORKER_LOCK(w);
     }
 
@@ -1276,16 +1271,6 @@ static void random_steal(__cilkrts_worker *w)
         //fail to steal work on locality steal, add 1 to counter
         if(locality_flag) w->l->locality_steal_attempt++;
 #endif
-
-        // failed to steal work.  Return the fiber to the pool.
-        START_INTERVAL(w, INTERVAL_FIBER_DEALLOCATE) {
-            int ref_count = cilk_fiber_remove_reference(fiber, &w->l->fiber_pool);
-
-            // Fibers we use when trying to steal should not be active,
-            // and thus should not have any other references.
-            CILK_ASSERT(0 == ref_count);
-        } STOP_INTERVAL(w, INTERVAL_FIBER_DEALLOCATE);
-
     } else {
 #ifndef BIN_METHOD
         // If sucess on steal attempt, reset counter.
@@ -1294,8 +1279,10 @@ static void random_steal(__cilkrts_worker *w)
 #endif
         // Since our steal was successful, finish initialization of
         // the fiber.
+        /*
         cilk_fiber_reset_state(fiber,
                                fiber_proc_to_resume_user_code_for_random_steal);
+        */
         // Record the pedigree of the frame that w has stolen.
         // record only if CILK_RECORD_LOG is set
         replay_record_steal(w, victim_id);
@@ -2464,7 +2451,7 @@ static void do_sync(__cilkrts_worker *w, full_frame *ff,
             // provably good steal successful; at this point, we have
             // ownership on frame_ff
             if(steal_result == CONTINUE_EXECUTION) { 
-                if(!check_frame_for_designated_socket(w, ff)) {
+                if(check_frame_for_designated_socket(w, ff) == w) {
                     // if not pinned on designated socket, check the sync master
                     check_frame_for_sync_master(w, ff);
                 }
@@ -2727,7 +2714,7 @@ static void do_return_from_spawn(__cilkrts_worker *w,
         // provably good steal successful; at this point, we have
         // ownership on frame_ff
         if(steal_result == CONTINUE_EXECUTION) {
-            if(!check_frame_for_designated_socket(w, parent_ff)) { 
+            if(check_frame_for_designated_socket(w, parent_ff) == w) { 
                 // if not pinned on designated socket, check the sync master
                 check_frame_for_sync_master(w, parent_ff);
             }
@@ -3161,13 +3148,6 @@ __cilkrts_worker *make_worker(global_state_t *g,
     w->l->steal_failure_count = 0;
 
     w->l->work_stolen = 0;
-    // ANGE XXX: FIX ME use Justin's define
-    if(w->g->P > 4) {
-        w->l->my_socket_id = self / (w->g->P >> 2);
-    } else {
-        w->l->my_socket_id = self;
-    }
-
     // Initialize record/replay assuming we're doing neither
     w->l->record_replay_fptr = NULL;
     w->l->replay_list_root = NULL;
@@ -3177,20 +3157,29 @@ __cilkrts_worker *make_worker(global_state_t *g,
     w->l->worker_magic_1 = WORKER_MAGIC_1;
 
 #ifndef BIN_METHOD
-	// Intitalize locality aware stealing
-	w->l->locality_steal_attempt = 0;
+    // Intitalize locality aware stealing
+    w->l->locality_steal_attempt = 0;
 #endif
-	w->l->local_min_worker = ((int)(self / w->g->workers_per_socket)) * w->g->workers_per_socket;
-
-	w->l->higher_neighbor_min_worker = (w->l->local_min_worker + w->g->workers_per_socket) % (w->g->workers_per_socket * w->g->num_sockets);
-
-	w->l->lower_neighbor_min_worker = (w->l->local_min_worker - w->g->workers_per_socket) % (w->g->workers_per_socket * w->g->num_sockets);
+    // ANGE XXX: minor update to rid of mod 
+    CILK_ASSERT(w->g->workers_per_socket * w->g->num_sockets == w->g->P);
+    w->l->my_socket_id = self / w->g->workers_per_socket;
+    w->l->local_min_worker = w->l->my_socket_id * w->g->workers_per_socket;
+    w->l->higher_neighbor_min_worker = w->l->local_min_worker + w->g->workers_per_socket;
+    if(w->l->higher_neighbor_min_worker >= w->g->P) {
+        w->l->higher_neighbor_min_worker -= w->g->P;
+    }
+    w->l->lower_neighbor_min_worker = w->l->local_min_worker - w->g->workers_per_socket;
+    if(w->l->lower_neighbor_min_worker < 0) {
+        w->l->lower_neighbor_min_worker += w->g->P;
+    }
 
 #ifdef BIN_METHOD
-	w->l->remote_neighbor_min_worker = (w->l->higher_neighbor_min_worker + w->g->workers_per_socket) % (w->g->workers_per_socket * w->g->num_sockets);
+    w->l->remote_neighbor_min_worker = w->l->higher_neighbor_min_worker + w->g->workers_per_socket;
+    if(w->l->remote_neighbor_min_worker >= w->g->P) {
+        w->l->remote_neighbor_min_worker -= w->g->P;
+    }
 #endif
-
-	/*w->parallelism_disabled = 0;*/
+    /*w->parallelism_disabled = 0;*/
 
     // Allow stealing all frames. Sets w->saved_protected_tail
     __cilkrts_restore_stealing(w, w->ltq_limit);

@@ -388,12 +388,6 @@ struct local_state  /* COMMON_PORTABLE */
     int work_stolen;
 
     /**
-     * The socket id the worker is on.  Once initialized, doesn't change.
-     * [local read]
-     **/
-    int my_socket_id;
-
-    /**
      * File pointer for record or replay
      * Does FILE * work on Windows?
      * During record, the file will be opened in write-only mode.
@@ -452,26 +446,35 @@ struct local_state  /* COMMON_PORTABLE */
 #endif
 
     /**
-     * This varibale holds the lowest worker number on the worker's LOCAL socket.
+     * The socket id the worker is on.  Once initialized, doesn't change.
+     * [local read]
      */
-    unsigned int local_min_worker;
+    int my_socket_id;
+
+    /**
+     * This varibale holds the lowest worker number on the worker's LOCAL socket.
+     * [local read]
+     */
+    int local_min_worker;
 
     /**
      * This variable holds the lowest worker number on the worker's HIGHER NEIGHBOR.
+     * [local read]
      */
-    unsigned int higher_neighbor_min_worker;
+    int higher_neighbor_min_worker;
 
     /**
      * This varibale holds the lowest worker number on the worker's LOWER NEIGHBOR.
+     * [local read]
      */
-    unsigned int lower_neighbor_min_worker;
+    int lower_neighbor_min_worker;
 
 #ifdef BIN_METHOD
     /**
      * This variable holds the the lowest worker number on the worker's MOST REMOTE SOCKET
+     * [local read]
      */
-
-     unsigned int remote_neighbor_min_worker;
+    int remote_neighbor_min_worker;
 #endif
 
 };

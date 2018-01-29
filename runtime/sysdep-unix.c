@@ -301,6 +301,7 @@ void __cilkrts_start_workers(global_state_t *g, int n)
     }
 
     int cpu_offset = 0;
+    // ANGE XXX: Check with Justin
     //Itterate through the workers and pin them to a core
     for (int j = 1; j < g->P; j++) {
         if(j % g->workers_per_socket == 0) {
@@ -310,11 +311,10 @@ void __cilkrts_start_workers(global_state_t *g, int n)
         cpu_set_t mask;
         CPU_ZERO(&mask);
         CPU_SET(j + cpu_offset, &mask);
-        int ret_val = pthread_setaffinity_np(g->sysdep->threads[j - 1], sizeof(mask), &mask);
+        int ret_val = pthread_setaffinity_np(g->sysdep->threads[j], sizeof(mask), &mask);
         if (ret_val != 0) {
             printf("ERROR: Could not set CPU affinity");
         }
-
    }  
 
     // write the version information to a file if the environment is configured

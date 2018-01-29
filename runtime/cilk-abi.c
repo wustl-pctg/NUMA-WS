@@ -801,6 +801,19 @@ CILK_ABI_VOID __cilkrts_unset_pinning_info() {
     sf->flags &= ~CILK_FRAME_WITH_DESIGNATED_SOCKET;
 }
 
+CILK_ABI_VOID __cilkrts_disable_nonlocal_steal() {
+    __cilkrts_worker *w = __cilkrts_get_tls_worker();
+    CILK_ASSERT(w != NULL);
+    w->g->disable_nonlocal_steal = 1;
+    __cilkrts_fence();
+}
+
+CILK_ABI_VOID __cilkrts_enable_nonlocal_steal() {
+    __cilkrts_worker *w = __cilkrts_get_tls_worker();
+    CILK_ASSERT(w != NULL);
+    w->g->disable_nonlocal_steal = 0;
+    __cilkrts_fence();
+}
 
 CILK_API_INT
 __cilkrts_bump_loop_rank_internal(__cilkrts_worker* w)

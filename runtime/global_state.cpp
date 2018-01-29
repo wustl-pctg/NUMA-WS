@@ -515,21 +515,30 @@ global_state_t* cilkg_get_user_settable_values()
      * Locality Global Variables
      */
     g->num_sockets = 4; // assume 4 socket machine
-    g->workers_per_socket = 8; // assume 8 cores per socket 
 
     if (cilkos_getenv(envstr, sizeof(envstr), "CILK_NUM_SOCKETS"))
         // Limit to no less than 1 and no more than 4
         store_int(&g->num_sockets, envstr, 1, 4);
 
-    if (cilkos_getenv(envstr, sizeof(envstr), "CILK_WORKERS_PER_SOCKET"))
+    if (cilkos_getenv(envstr, sizeof(envstr), "CILK_WORKERS_PER_SOCKET")) {
         // Limit to no less than 1 and no more than 4
         store_int(&g->workers_per_socket, envstr, 1, 8);
-
+    } else {
+        if(g->P <= 4) {
+            g->num_sockets = g->P;
+            g->workers_per_socket = 1;
+        } else {
+            g->workers_per_socket = g->P / 4; // ANGE XXX: updated so I can debug
+        }
+    }
+    
+    CILK_ASSERT(g->P == g->num_sockets * g->workers_per_socket);
     //set the number of workers now
-    g->P = g->num_sockets * g->workers_per_socket;
+    // g->P = g->num_sockets * g->workers_per_socket;
 
 
 #ifdef BIN_METHOD
+    // ANGE XXX: Why not just initialize as a fraction and scale accordingly
     // Initialize locality variables
     g->local_percent = 50;
     g->neighbor_percent = 33;
@@ -556,17 +565,19 @@ global_state_t* cilkg_get_user_settable_values()
         printf("WARNING: You are using 2 sockets. CILK_REMOTE_PERCENT is ignored!\n");
         g->remote_percent = 0;
     }
-#endif
 
-#ifndef BIN_METHOD
+#else // ifndef BIN_METHOD
     // Initialize locality variables
+    // ANGE XXX: modified to 1-to-k ratio for easier interpretation
     g->locality_ratio = 2; // 2 for equal likelyhood
 
     // Environment variables for locality
     if (cilkos_getenv(envstr, sizeof(envstr), "CILK_LOCALITY_RATIO"))
         // Limit to no less than 2 (50/50) and no more than 10000
-        store_int(&g->locality_ratio, envstr, 2, 10000);
+        store_int(&g->locality_ratio, envstr, 1, 10000);
 #endif
+
+    g->disable_nonlocal_steal = 0;
 
     return g;
 
