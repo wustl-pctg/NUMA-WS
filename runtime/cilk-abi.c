@@ -361,7 +361,7 @@ CILK_ABI_VOID __cilkrts_suspend(void)
     __cilkrts_stack_frame *sf = w->current_stack_frame;
     if (0 == (sf->flags & CILK_FRAME_LAST) || (sf->flags & CILK_FRAME_UNSYNCHED))
         return;
-    __cilkrts_worker *root = g->workers[0];
+    __cilkrts_worker *root = g->workers[1]; // first sytem worker
     root->l->steal_failure_count = g->max_steal_failures + 1;
     CILK_ASSERT(root->l->signal_node);
     signal_node_msg(root->l->signal_node, 0);
@@ -375,7 +375,7 @@ CILK_ABI_VOID __cilkrts_resume(void)
     global_state_t *g = cilkg_get_global_state();
     if (NULL == g || g->P < 2)
         return;
-    __cilkrts_worker *root = g->workers[0];
+    __cilkrts_worker *root = g->workers[1];
     CILK_ASSERT(root->l->signal_node);
     signal_node_msg(root->l->signal_node, 1);
 }
@@ -406,7 +406,7 @@ static __cilkrts_worker *find_free_worker(global_state_t *g)
 
     // Scan the non-system workers looking for one which is free so we can
     // use it.
-    for (i = g->P - 1; i < g->total_workers; ++i) {
+    for(i = 0; i < g->total_workers; i++) {
         w = g->workers[i];
         CILK_ASSERT(WORKER_SYSTEM != w->l->type);
         if (w->l->type == WORKER_FREE) {
@@ -782,7 +782,24 @@ CILK_API_INT __cilkrts_synched(void)
     return 1 == ff->join_counter;
 }
 
+CILK_ABI_VOID __cilkrts_set_pinning_info(int32_t socket_id) {
+    __cilkrts_worker *w = __cilkrts_get_tls_worker();
+    CILK_ASSERT(w != NULL);
+    __cilkrts_stack_frame *sf = w->current_stack_frame;
+    CILK_ASSERT(sf != NULL);
+    
+    sf->flags |= CILK_FRAME_WITH_DESIGNATED_SOCKET;
+    sf->size = socket_id;
+}
 
+CILK_ABI_VOID __cilkrts_unset_pinning_info() {
+    __cilkrts_worker *w = __cilkrts_get_tls_worker();
+    CILK_ASSERT(w != NULL);
+    __cilkrts_stack_frame *sf = w->current_stack_frame;
+    CILK_ASSERT(sf != NULL);
+
+    sf->flags &= ~CILK_FRAME_WITH_DESIGNATED_SOCKET;
+}
 
 
 CILK_API_INT

@@ -277,23 +277,6 @@ static void create_threads(global_state_t *g, int base, int top)
     }
 }
 
-#if PARALLEL_THREAD_CREATE
-static int volatile threads_created = 0;
-
-// Create approximately half of the worker threads, and then become a worker
-// ourselves.
-static void * create_threads_and_work (void * arg)
-{
-    global_state_t *g = ((__cilkrts_worker *)arg)->g;
-
-    create_threads(g, g->P/2, g->P-1);
-    // Let the initial thread know that we're done.
-    threads_created = 1;
-
-    // Ideally this turns into a tail call that wipes out this stack frame.
-    return scheduler_thread_proc_for_system_worker(arg);
-}
-#endif
 void __cilkrts_start_workers(global_state_t *g, int n)
 {
     g->workers_running = 1;
@@ -303,30 +286,9 @@ void __cilkrts_start_workers(global_state_t *g, int n)
         return;
 
     // Do we actually have any threads to create?
-    if (n > 0)
-    {
-#if PARALLEL_THREAD_CREATE
-            int status;
-            // We create (a rounded up) half of the threads, thread one creates the rest
-            int half_threads = (n+1)/2;
-        
-            // Create the first thread passing a different thread function, so that it creates threads itself
-            status = pthread_create(&g->sysdep->threads[0], NULL, create_threads_and_work, g->workers[0]);
-
-            if (status != 0)
-                __cilkrts_bug("Cilk runtime error: thread creation (0) failed: %d\n", status);
-            
-            // Then the rest of the ones we have to create
-            create_threads(g, 1, half_threads);
-
-            // Now wait for the first created thread to tell us it's created all of its threads.
-            // We could maybe drop this a bit lower and overlap with write_version_file.
-            while (!threads_created)
-                __cilkrts_yield();
-#else
-            // Simply create all the threads linearly here.
-            create_threads(g, 0, n);
-#endif
+    if (n > 0) {
+        // Simply create all the threads linearly here.
+        create_threads(g, 1, n+1); // worker 0 is reserved as user worker
     }
     // write the version information to a file if the environment is configured
     // for it (the function makes the check).
@@ -352,18 +314,18 @@ void __cilkrts_stop_workers(global_state_t *g)
 
     /* Make them all runnable. */
     if (g->P > 1) {
-        CILK_ASSERT(g->workers[0]->l->signal_node);
-        signal_node_msg(g->workers[0]->l->signal_node, 1);
+        CILK_ASSERT(g->workers[1]->l->signal_node);
+        signal_node_msg(g->workers[1]->l->signal_node, 1);
     }
 
-        for (i = 0; i < g->P - 1; ++i) {
-            int sc_status;
-            void *th_status;
+    for (i = 1; i < g->P; ++i) { // threads[0] is the user thread
+        int sc_status;
+        void *th_status;
 
-            sc_status = pthread_join(g->sysdep->threads[i], &th_status);
-            if (sc_status != 0)
-                __cilkrts_bug("Cilk runtime error: thread join (%d) failed: %d\n", i, sc_status);
-        }
+        sc_status = pthread_join(g->sysdep->threads[i], &th_status);
+        if (sc_status != 0)
+            __cilkrts_bug("Cilk runtime error: thread join (%d) failed: %d\n", i, sc_status);
+    }
 
     g->workers_running = 0;
 
@@ -699,11 +661,7 @@ static void write_version_file (global_state_t *g, int n)
     fprintf(fp, "System cores: %d\n", (int)sysconf(_SC_NPROCESSORS_ONLN));
 #endif    
     fprintf(fp, "Cilk workers requested: %d\n", n);
-#if (PARALLEL_THREAD_CREATE)
-        fprintf(fp, "Thread creator: Private (parallel)\n");
-#else
         fprintf(fp, "Thread creator: Private\n");
-#endif
 
     if (fp != stderr && fp != stdout) fclose(fp);
     else fflush(fp); // flush the handle buffer if it is stdout or stderr.

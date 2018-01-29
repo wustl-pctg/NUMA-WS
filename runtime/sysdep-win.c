@@ -554,7 +554,7 @@ void __cilkrts_start_workers(global_state_t *g, int n)
     }
 
         // Start the requested number of worker threads
-        for (i = 0; i < n; ++i)
+        for (i = 1; i <= n; ++i)
         {
             g->sysdep->hThreads[i] =
                 (HANDLE)_beginthreadex((void *)NULL,                // security attrib
@@ -590,8 +590,8 @@ void __cilkrts_stop_workers(global_state_t *g)
     // exit cleanly
     if (g->P > 1)
     {
-        CILK_ASSERT(g->workers[0]->l->signal_node);
-        signal_node_msg(g->workers[0]->l->signal_node, 1);
+        CILK_ASSERT(g->workers[1]->l->signal_node);
+        signal_node_msg(g->workers[1]->l->signal_node, 1);
     }
 
         // Wait for all of the workers to exit, unless the sole worker is a

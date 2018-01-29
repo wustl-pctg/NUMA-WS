@@ -109,13 +109,13 @@ COMMON_SYSDEP int __cilkrts_xchg(volatile int *ptr, int x)
  *
  * This declaration should generate an error when the Intel compiler adds
  * supprt for the intrinsic.
- */
 #if defined(__INTEL_COMPILER) || defined(__clang__)
 static inline int __builtin_cpu_supports(const char *feature)
 {
     return 1;
 }
 #endif
+*/
 
 /*
  * Restore the floating point state that is stored in a stack frame at each

@@ -194,9 +194,27 @@ struct local_state  /* COMMON_PORTABLE */
      * Full frame that the worker will be working on next
      *
      * This field is normally local for a worker w.  Another worker v
-     * may modify w->l->next_frame_ff, however, in the special case
-     * when v is returning a frame to a user thread w since w is the
+     * may modify w->l->next_frame_ff, however, in two special cases:
+     * 
+     * 1) when v is returning a frame to a user thread w since w is the
      * team leader.
+     *
+     * 2) due to __cilkrts_set_pinning_info
+     *
+     * Typically __cilkrts_set_pinning_info should only be used at the
+     * top level function to pin frames to a specific socket.  We will
+     * look at the size field in the frame and randomly pick a worker
+     * within that socket to pin the frame to.
+     * 
+     * Even though typically the unlocked accesses to w->l->next_frame_ff
+     * should be safe (i.e., the worker we push this frame to must be idle),
+     * this require that the user uses it properly (only at top-level for
+     * initial work distribution), and there is no guarantee of that.  
+     * Thus, we better synchronize the access to it using worker lock.
+     *
+     * Once pushed, only the worker it belongs to can start working
+     * on it.  Technically we could allow any worker on the same socket
+     * to work on it under case 2), but let's not worry about that for now. 
      *
      * [shared read/write]
      */
@@ -368,6 +386,12 @@ struct local_state  /* COMMON_PORTABLE */
      * [local read/write]
      */
     int work_stolen;
+
+    /**
+     * The socket id the worker is on.  Once initialized, doesn't change.
+     * [local read]
+     **/
+    int my_socket_id;
 
     /**
      * File pointer for record or replay

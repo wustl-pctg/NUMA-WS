@@ -228,11 +228,11 @@ int set_param_imp(global_state_t* g, const CHAR_T* param, const CHAR_T* value)
 {
     static const char* const s_force_reduce     = "force reduce";
     static const char* const s_nworkers         = "nworkers";
-    static const char* const s_max_user_workers = "max user workers";
     static const char* const s_local_stacks     = "local stacks";
     static const char* const s_shared_stacks    = "shared stacks";
     static const char* const s_nstacks          = "nstacks";
     static const char* const s_stack_size       = "stack size";
+    // static const char* const s_max_user_workers = "max user workers";
 
     // We must have a parameter and a value
     if (0 == param)
@@ -280,6 +280,7 @@ int set_param_imp(global_state_t* g, const CHAR_T* param, const CHAR_T* value)
             g->P = hardware_cpu_count;
         return ret;
     }
+    /* disallow the option 
     else if (strmatch(param, s_max_user_workers))
     {
         // ** UNDOCUMENTED **
@@ -290,7 +291,7 @@ int set_param_imp(global_state_t* g, const CHAR_T* param, const CHAR_T* value)
 
         return store_int(&g->max_user_workers, value, 1,
                          16 * hardware_cpu_count);
-    }
+    } */
     else if (strmatch(param, s_local_stacks))
     {
         // ** UNDOCUMENTED **
@@ -353,11 +354,14 @@ inline
 int calc_max_user_workers(global_state_t *g)
 {
     // If it's been set by the user, give back what we got
+    /*
     if (g->max_user_workers > 0)
         return g->max_user_workers;
 
     // Calculate it
     return std::max(3, g->P * 2);
+    */
+    return 1; 
 }
 
 } // end unnamed namespace
@@ -406,7 +410,7 @@ global_state_t* cilkg_get_user_settable_values()
         g->under_ptool              = under_ptool;
         g->force_reduce             = 0;   // Default Off
         g->P                        = hardware_cpu_count;   // Defaults to hardware CPU count
-        g->max_user_workers         = 0;   // 0 unless set by user
+        // g->max_user_workers         = 0;   // 0 unless set by user
         g->fiber_pool_size          = 7;   // Arbitrary default
         
         g->global_fiber_pool_size   = 3 * 3* g->P;  // Arbitrary default
@@ -456,12 +460,14 @@ global_state_t* cilkg_get_user_settable_values()
             // and no more than 16 times the number of hardware threads.
             store_int(&g->P, envstr, 1, 16 * hardware_cpu_count);
 
+        /*
         if (cilkos_getenv(envstr, sizeof(envstr), "CILK_MAX_USER_WORKERS"))
             // Set max_user_workers to environment variable, but limit to no
             // less than 1 and no more 16 times the number of hardware
             // threads.  If not specified, defaults (somewhat arbitrarily) to
             // the larger of 3 and twice the number of hardware threads.
             store_int(&g->max_user_workers, envstr, 1, 16*hardware_cpu_count);
+        */
 
         if (cilkos_getenv(envstr, sizeof(envstr), "CILK_STEAL_FAILURES"))
             // Set the number of times a worker should fail to steal before

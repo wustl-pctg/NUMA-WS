@@ -257,6 +257,10 @@ CILK_API(int) __cilkrts_set_seh_callback(__cilkrts_pfn_seh_callback pfn);
 #endif /* _WIN32 */
 
 #if __CILKRTS_ABI_VERSION >= 1
+
+CILK_API(void) __cilkrts_set_pinning_info(int32_t socket_no);
+CILK_API(void) __cilkrts_unset_pinning_info();
+
 /* Pedigree API is available only for compilers that use ABI version >= 1. */
 
 

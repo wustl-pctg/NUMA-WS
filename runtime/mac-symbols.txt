@@ -1,6 +1,8 @@
 # Exported symbol list:
 ___cilkrts_bind_thread
 ___cilkrts_bind_thread_1
+___cilkrts_set_pinning_info
+___cilkrts_unset_pinning_info
 ___cilkrts_bump_loop_rank
 ___cilkrts_bump_loop_rank_internal
 ___cilkrts_bump_worker_rank

@@ -33,6 +33,8 @@
 
 __cilkrts_bind_thread
 __cilkrts_bind_thread_1
+__cilkrts_set_pinning_info
+__cilkrts_unset_pinning_info
 __cilkrts_bump_loop_rank
 __cilkrts_bump_loop_rank_internal
 __cilkrts_bump_worker_rank

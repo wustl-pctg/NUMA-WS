@@ -247,8 +247,7 @@ struct __cilkrts_worker {
  * is a function that spawns or detaches.  Only spawning functions
  * are visible to the Cilk runtime.
  */
-struct __cilkrts_stack_frame
-{
+struct __cilkrts_stack_frame {
     /**
      * flags is an integer with values defined below.  Client code
      * initializes flags to CILK_FRAME_VERSION before the first Cilk
@@ -394,6 +393,13 @@ struct __cilkrts_stack_frame
 
 /** Used by Windows exception handling to indicate that __cilkrts_leave_frame should do nothing */
 #define CILK_FRAME_UNWINDING 0x10000
+
+/** Used by the locality runtime to set pinning for a frame
+ *  When this flag is set, a worker stealing the contiutaion
+ *  of a frame should send the promoted full frame to some worker
+ *  on the socket with ID indicated by the ``size'' field. 
+ **/
+#define CILK_FRAME_WITH_DESIGNATED_SOCKET 0x20000
 
 /*
  * The low 24-bits of the 'flags' field are the flags, proper.  The high 8-bits
