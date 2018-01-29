@@ -4,11 +4,11 @@
  *
  *  Copyright (C) 2009-2015, Intel Corporation
  *  All rights reserved.
- *  
+ *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted provided that the following conditions
  *  are met:
- *  
+ *
  *    * Redistributions of source code must retain the above copyright
  *      notice, this list of conditions and the following disclaimer.
  *    * Redistributions in binary form must reproduce the above copyright
@@ -18,7 +18,7 @@
  *    * Neither the name of Intel Corporation nor the names of its
  *      contributors may be used to endorse or promote products derived
  *      from this software without specific prior written permission.
- *  
+ *
  *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -31,9 +31,9 @@
  *  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY
  *  WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
- *  
+ *
  *  *********************************************************************
- *  
+ *
  *  PLEASE NOTE: This file is a downstream copy of a file mainitained in
  *  a repository at cilkplus.org. Changes made to this file that are not
  *  submitted through the contribution process detailed at
@@ -42,7 +42,7 @@
  *  GNU compiler collection or posted to the git repository at
  *  https://bitbucket.org/intelcilkplusruntime/itnel-cilk-runtime.git are
  *  not tracked.
- *  
+ *
  *  We welcome your contributions to this open source project. Thank you
  *  for your assistance in helping us improve Cilk Plus.
  **************************************************************************/
@@ -80,7 +80,7 @@ __CILKRTS_BEGIN_EXTERN_C
 struct full_frame;
 struct free_list;
 struct pending_exception_info;
-/// Opaque type for replay entry. 
+/// Opaque type for replay entry.
 typedef struct replay_entry_t replay_entry_t;
 
 /**
@@ -121,7 +121,7 @@ typedef enum cilk_worker_type
  *  Local: This field is only accessed by the thread bound to this
  *    worker struct.  Local fields can be freely accessed without
  *    acquiring locks.
- *  
+ *
  *  Shared: This field may be accessed by multiple worker threads.
  *    Accesses to shared fields usually requires locks, except in
  *    special situations where one can prove that locks are
@@ -263,7 +263,7 @@ struct local_state  /* COMMON_PORTABLE */
      * [shared read-only]
      */
     cilk_worker_type type;
-    
+
     /**
      * Lazy task queue of this worker - an array of pointers to stack frames.
      *
@@ -304,7 +304,7 @@ struct local_state  /* COMMON_PORTABLE */
 
     /**
      * State of the random number generator
-     * 
+     *
      * [local read/write]
      */
     unsigned rand_seed;
@@ -318,7 +318,7 @@ struct local_state  /* COMMON_PORTABLE */
 
     /**
      * __cilkrts_stack_frame we suspended when we transferred onto the
-     * scheduling stack.    
+     * scheduling stack.
      *
      * [local read/write]
      */
@@ -364,7 +364,7 @@ struct local_state  /* COMMON_PORTABLE */
     /**
      * Support for statistics
      *
-     * Useful only when CILK_PROFIlE is compiled in. 
+     * Useful only when CILK_PROFIlE is compiled in.
      * [local read/write]
      */
     statistics* stats;
@@ -416,12 +416,12 @@ struct local_state  /* COMMON_PORTABLE */
      * [local read/write]
      */
     replay_entry_t *replay_list_entry;
-    
+
     /**
      * Separate the signal_node from other things in the local_state by the
      * sizeof a cache line for performance reasons.
      *
-     * unused 
+     * unused
      */
     char buf[64];
 
@@ -442,6 +442,38 @@ struct local_state  /* COMMON_PORTABLE */
      * [shared read-only]
      */
     ls_magic_t worker_magic_1;
+
+#ifndef BIN_METHOD
+    /**
+     * This variable holds the number of locality failed steals. If it's non-zero
+     * the scheduler should only attempt locality steals.
+     */
+    unsigned int locality_steal_attempt;
+#endif
+
+    /**
+     * This varibale holds the lowest worker number on the worker's LOCAL socket.
+     */
+    unsigned int local_min_worker;
+
+    /**
+     * This variable holds the lowest worker number on the worker's HIGHER NEIGHBOR.
+     */
+    unsigned int higher_neighbor_min_worker;
+
+    /**
+     * This varibale holds the lowest worker number on the worker's LOWER NEIGHBOR.
+     */
+    unsigned int lower_neighbor_min_worker;
+
+#ifdef BIN_METHOD
+    /**
+     * This variable holds the the lowest worker number on the worker's MOST REMOTE SOCKET
+     */
+
+     unsigned int remote_neighbor_min_worker;
+#endif
+
 };
 
 /**

@@ -4,11 +4,11 @@
  *
  *  Copyright (C) 2007-2015, Intel Corporation
  *  All rights reserved.
- *  
+ *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted provided that the following conditions
  *  are met:
- *  
+ *
  *    * Redistributions of source code must retain the above copyright
  *      notice, this list of conditions and the following disclaimer.
  *    * Redistributions in binary form must reproduce the above copyright
@@ -18,7 +18,7 @@
  *    * Neither the name of Intel Corporation nor the names of its
  *      contributors may be used to endorse or promote products derived
  *      from this software without specific prior written permission.
- *  
+ *
  *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -31,9 +31,9 @@
  *  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY
  *  WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
- *  
+ *
  *  *********************************************************************
- *  
+ *
  *  PLEASE NOTE: This file is a downstream copy of a file mainitained in
  *  a repository at cilkplus.org. Changes made to this file that are not
  *  submitted through the contribution process detailed at
@@ -42,7 +42,7 @@
  *  GNU compiler collection or posted to the git repository at
  *  https://bitbucket.org/intelcilkplusruntime/itnel-cilk-runtime.git are
  *  not tracked.
- *  
+ *
  *  We welcome your contributions to this open source project. Thank you
  *  for your assistance in helping us improve Cilk Plus.
  *
@@ -103,7 +103,7 @@
 
 #ifdef __VXWORKS__
 // redeclare longjmp() with noreturn to stop warnings
-extern __attribute__((noreturn)) 
+extern __attribute__((noreturn))
 		void longjmp(jmp_buf, int);
 #endif
 
@@ -147,7 +147,7 @@ enum provably_good_steal_t
 static inline void verify_current_wkr(__cilkrts_worker *w)
 {
 #if ((REDPAR_DEBUG >= 3) || (FIBER_DEBUG >= 1))
-    // Lookup the worker from TLS and compare to w. 
+    // Lookup the worker from TLS and compare to w.
     __cilkrts_worker* tmp = __cilkrts_get_tls_worker();
     if (w != tmp) {
         fprintf(stderr, "Error.  W=%d, actual worker =%d...\n",
@@ -156,7 +156,7 @@ static inline void verify_current_wkr(__cilkrts_worker *w)
     }
     CILK_ASSERT(w == tmp);
 #endif
-}                                                            
+}
 
 static enum schedule_t worker_runnable(__cilkrts_worker *w);
 
@@ -323,7 +323,7 @@ static int worker_trylock_other(__cilkrts_worker *w,
     /* This protocol guarantees that, after setting the DO_NOT_STEAL
        flag, worker W can enter its critical section after waiting for
        the thief currently in the critical section (if any) and at
-       most one other thief.  
+       most one other thief.
 
        This requirement is overly paranoid, but it should protect us
        against future nonsense from OS implementors.
@@ -524,9 +524,9 @@ static void unset_sync_master(__cilkrts_worker *w, full_frame *ff)
  * with C++ throw-catch exceptions -- it refers only to a non-normal return,
  * i.e., a steal or similar scheduling exception.
  *
- * with H <= E, H <= T.  
+ * with H <= E, H <= T.
  *
- * Stack frames SF, where H <= E < T, are available for stealing. 
+ * Stack frames SF, where H <= E < T, are available for stealing.
  *
  * The worker operates on the T end of the stack.  The frame being
  * worked on is not on the stack.  To make a continuation available for
@@ -604,7 +604,7 @@ static void reset_THE_exception(__cilkrts_worker *w)
 /* conditions under which victim->head can be stolen: */
 static int can_steal_from(__cilkrts_worker *victim)
 {
-    return ((victim->head < victim->tail) && 
+    return ((victim->head < victim->tail) &&
             (victim->head < victim->protected_tail));
 }
 
@@ -628,16 +628,16 @@ static int dekker_protocol(__cilkrts_worker *victim)
     } else {
         /* failure, restore previous state */
         decrement_E(victim);
-        return 0;    
+        return 0;
     }
 }
 
 
 /* Link PARENT and CHILD in the spawn tree */
-static full_frame *make_child(__cilkrts_worker *w, 
+static full_frame *make_child(__cilkrts_worker *w,
                               full_frame *parent_ff,
                               __cilkrts_stack_frame *child_sf,
-                              cilk_fiber *fiber) 
+                              cilk_fiber *fiber)
 {
     full_frame *child_ff = __cilkrts_make_full_frame(w, child_sf);
 
@@ -687,8 +687,8 @@ static inline __cilkrts_stack_frame *__cilkrts_advance_frame(__cilkrts_stack_fra
     return p;
 }
 
-/* w should be the currently executing worker.  
- * loot_sf is the youngest stack frame in the call stack being 
+/* w should be the currently executing worker.
+ * loot_sf is the youngest stack frame in the call stack being
  *   unrolled (i.e., the most deeply nested stack frame.)
  *
  * When this method is called for a steal, loot_sf should be on a
@@ -699,13 +699,13 @@ static inline __cilkrts_stack_frame *__cilkrts_advance_frame(__cilkrts_stack_fra
  * older to younger, i.e., a __cilkrts_stack_frame points to parent.
  *
  * This method creates a full frame for each __cilkrts_stack_frame in
- * the call stack, with each full frame also pointing to its parent. 
+ * the call stack, with each full frame also pointing to its parent.
  *
  * The method returns the full frame created for loot_sf, i.e., the
  * youngest full frame.
  */
-static full_frame *unroll_call_stack(__cilkrts_worker *w, 
-                                     full_frame *ff, 
+static full_frame *unroll_call_stack(__cilkrts_worker *w,
+                                     full_frame *ff,
                                      __cilkrts_stack_frame *const loot_sf)
 {
     __cilkrts_stack_frame *sf = loot_sf;
@@ -1008,20 +1008,20 @@ void fiber_proc_to_resume_user_code_for_random_steal(cilk_fiber *fiber)
     // in this function, so that when the OS exception handling code
     // walks off the top of the current Cilk stack, it reaches our stub
     // handler.
-    
+
     // Also, this function needs to be wrapped into a try-catch block
     // so the compiler generates the appropriate exception information
     // in this frame.
-    
+
     // TBD: IS THIS HANDLER IN THE WRONG PLACE?  Can we longjmp out of
     // this function (and does it matter?)
 #if defined(_WIN32) && !defined(_WIN64)
     install_exception_stub_handler();
-    __try 
+    __try
 #endif
     {
         char* new_sp = sysdep_reset_jump_buffers_for_resume(fiber, ff, sf);
-        
+
         // Notify the Intel tools that we're stealing code
         ITT_SYNC_ACQUIRED(sf->worker);
         NOTIFY_ZC_INTRINSIC("cilk_continue", sf);
@@ -1029,7 +1029,7 @@ void fiber_proc_to_resume_user_code_for_random_steal(cilk_fiber *fiber)
         // TBD: We'd like to move TBB-interop methods into the fiber
         // eventually.
         cilk_fiber_invoke_tbb_stack_op(fiber, CILK_TBB_STACK_ADOPT);
-        
+
         sf->flags &= ~CILK_FRAME_SUSPENDED;
 
         // longjmp to user code.  Don't process exceptions here,
@@ -1054,6 +1054,18 @@ static void random_steal(__cilkrts_worker *w)
     __cilkrts_worker *victim = NULL;
     cilk_fiber *fiber = NULL;
     int n;
+	int locality_rand;
+
+#ifdef BIN_METHOD
+	int neighbor_percent_low;
+	int neighbor_percent_high;
+#endif
+
+#ifndef BIN_METHOD
+    unsigned steal_rand;
+	int locality_flag = 0;
+#endif
+
     int success = 0;
     int32_t victim_id;
 
@@ -1071,10 +1083,73 @@ static void random_steal(__cilkrts_worker *w)
        There must be only one worker to prevent stealing. */
     CILK_ASSERT(w->g->total_workers > 1);
 
-    /* pick random *other* victim */
-    n = myrand(w) % (w->g->total_workers - 1);
-    if (n >= w->self)
-        ++n;
+    /**
+     * IMPORTANT: Victim number is not the same as the core number!
+     */
+#ifdef BIN_METHOD
+		neighbor_percent_low = w->g->neighbor_percent >> 1;
+		neighbor_percent_high = w->g->neighbor_percent - neighbor_percent_low;
+		locality_rand = (myrand(w) % 100) + 1;
+
+        if(w->g->workers_per_socket == 1){
+            n = 0;
+        } else {
+		    n = myrand(w) % (w->g->workers_per_socket - 1);
+        }
+
+		//fall through the if block to find the right socket to steal from
+		if (w->g->remote_percent && locality_rand <= w->g->remote_percent) {
+			n = w->l->remote_neighbor_min_worker + n;
+		} else if (w->g->neighbor_percent && locality_rand <= (w->g->remote_percent + neighbor_percent_low)) {
+			n = w->l->lower_neighbor_min_worker + n;
+		} else if (w->g->neighbor_percent && locality_rand <= (w->g->remote_percent + neighbor_percent_low + neighbor_percent_high))  {
+			n = w->l->higher_neighbor_min_worker + n;
+		} else {
+			n = w->l->local_min_worker + n;
+		}
+
+		if (n >= w->self)
+            ++n;
+
+#endif
+
+#ifndef BIN_METHOD
+		locality_rand = myrand(w) % w->g->locality_ratio;
+
+		steal_rand = myrand(w);
+		//select which type of stealing to do
+		if(locality_rand == 0) { //do completely random steal if zero
+      		//printf("Random Steal\n");
+			/* pick random *other* victim */
+	        n = steal_rand % (w->g->P - 1);
+	        if (n >= w->self)
+	            ++n;
+		} else { //in all other cases try locality aware steal
+			locality_flag = 1;
+			/* pick random *other* victim */
+	    	n = steal_rand % (w->g->workers_per_socket -1); //mod # of cores per socket
+
+			/* Use different steal attempts based on previous failed attempts.
+			 * This starts over at p/4 on ANY success.
+			 */
+			if(w->l->locality_steal_attempt < w->g->P / 4) // less than p/4 steal attempts
+			{
+				n = w->l->local_min_worker + n;
+			} else if (w->l->locality_steal_attempt < w->g->P / 2) { // less than p/2 steal attempts
+				// randomly pick between higher and lower neighbors
+				if(myrand(w) % 2){
+					n = w->l->higher_neighbor_min_worker + n;
+				} else {
+					n = w->l->lower_neighbor_min_worker + n;
+				}
+			} else { // less than p steal attempts
+				n = steal_rand % (w->g->P - 1);
+			}
+
+	    	if (n >= w->self)
+	    		++n;
+		}
+#endif
 
     // If we're replaying a log, override the victim.  -1 indicates that
     // we've exhausted the list of things this worker stole when we recorded
@@ -1096,7 +1171,7 @@ static void random_steal(__cilkrts_worker *w)
 #if FIBER_DEBUG >= 2
         fprintf(stderr, "w=%d: failed steal because we could not get a fiber\n",
                 w->self);
-#endif        
+#endif
         return;
     }
 
@@ -1115,7 +1190,7 @@ static void random_steal(__cilkrts_worker *w)
         } STOP_INTERVAL(w, INTERVAL_FIBER_DEALLOCATE);
         return;
     }
-    
+
     /* Attempt to steal work from the victim */
     if (worker_trylock_other(w, victim)) {
         if (w->l->type == WORKER_USER && victim->l->team != w) {
@@ -1164,7 +1239,7 @@ static void random_steal(__cilkrts_worker *w)
                         #endif
 
                         // The use of victim->self contradicts our
-                        // classification of the "self" field as 
+                        // classification of the "self" field as
                         // local.  But since this code is only for
                         // debugging, it is ok.
                         DBGPRINTF ("%d-%p: Stealing work from worker %d\n"
@@ -1197,14 +1272,26 @@ static void random_steal(__cilkrts_worker *w)
     w->l->work_stolen = success;
 
     if (0 == success) {
+#ifndef BIN_METHOD
+        //fail to steal work on locality steal, add 1 to counter
+        if(locality_flag) w->l->locality_steal_attempt++;
+#endif
+
         // failed to steal work.  Return the fiber to the pool.
         START_INTERVAL(w, INTERVAL_FIBER_DEALLOCATE) {
             int ref_count = cilk_fiber_remove_reference(fiber, &w->l->fiber_pool);
+
             // Fibers we use when trying to steal should not be active,
             // and thus should not have any other references.
             CILK_ASSERT(0 == ref_count);
         } STOP_INTERVAL(w, INTERVAL_FIBER_DEALLOCATE);
+
     } else {
+#ifndef BIN_METHOD
+        // If sucess on steal attempt, reset counter.
+		// On any sucess, the locality steal will start over at p/4
+        w->l->locality_steal_attempt = 0;
+#endif
         // Since our steal was successful, finish initialization of
         // the fiber.
         cilk_fiber_reset_state(fiber,
@@ -1239,7 +1326,7 @@ static inline void provably_good_steal_reducers(__cilkrts_worker *w,
 
 /* at a provably good steal, incorporate the accumulated exceptions of
    children into the parent's exception */
-static void provably_good_steal_exceptions(__cilkrts_worker *w, 
+static void provably_good_steal_exceptions(__cilkrts_worker *w,
                                            full_frame       *ff)
 {
     // ASSERT: we own ff->lock
@@ -1328,18 +1415,18 @@ static inline void splice_exceptions_for_call(__cilkrts_worker *w,
     CILK_ASSERT(child_ff->is_call_child);
     CILK_ASSERT(NULL == child_ff->right_pending_exception);
     CILK_ASSERT(NULL == parent_ff->pending_exception);
-    
+
     parent_ff->pending_exception = child_ff->pending_exception;
     child_ff->pending_exception = NULL;
 }
 
 /**
- * Merge exceptions for a dying child. 
+ * Merge exceptions for a dying child.
  *
  * @param w                   The currently executing worker.
  * @param ff                  The child frame that is dying.
  * @param left_exception_ptr  Pointer to the exception that is to our left.
- */ 
+ */
 static inline
 void splice_exceptions_for_spawn(__cilkrts_worker *w,
                                  full_frame *ff,
@@ -1393,22 +1480,22 @@ static void finalize_child_for_call(__cilkrts_worker *w,
                                     full_frame *child_ff)
 {
     // ASSERT: we hold w->lock and parent_ff->lock
-    
+
     START_INTERVAL(w, INTERVAL_FINALIZE_CHILD) {
         CILK_ASSERT(child_ff->is_call_child);
         CILK_ASSERT(child_ff->join_counter == 0);
         CILK_ASSERT(!child_ff->rightmost_child);
         CILK_ASSERT(child_ff == parent_ff->rightmost_child);
 
-        // CHILD is about to die. 
+        // CHILD is about to die.
         // Splicing out reducers is a no-op for a call since
-        // w->reducer_map should already store the correct 
+        // w->reducer_map should already store the correct
         // reducer map.
-        
+
         // ASSERT there are no maps left to reduce.
         CILK_ASSERT(NULL == child_ff->children_reducer_map);
         CILK_ASSERT(NULL == child_ff->right_reducer_map);
-        
+
         splice_exceptions_for_call(w, parent_ff, child_ff);
 
         splice_stacks_for_call(w, parent_ff, child_ff);
@@ -1433,16 +1520,16 @@ static void finalize_child_for_call(__cilkrts_worker *w,
  * 1.  Suppose ff is synched and suspended.  Then either
  *
  *     (a) ff->children_reducer_map stores the reducer map that w
- *         should use, where w is the worker resuming execution of ff, 
+ *         should use, where w is the worker resuming execution of ff,
  *         OR
- *     (b) w already has a user map, and ff->children_reducer_map is NULL. 
+ *     (b) w already has a user map, and ff->children_reducer_map is NULL.
  *
  *     Case (a) happens when we are resuming execution of ff as a
  *     provably good steal.  In this case, w->reducer_map should be
  *     NULL and ff->children_reducer_map is valid.  To resume
  *     execution of ff on w, set w->reducer_map to
  *     ff->children_reducer_map.
- * 
+ *
  *     Case (b) occurs when we resume execution of ff because ff is a
  *     called child.  Then, ff->children_reducer_map should be NULL,
  *     and w should already have a valid reducer map when resuming
@@ -1452,12 +1539,12 @@ static void finalize_child_for_call(__cilkrts_worker *w,
  * 2. Suppose frame ff is not synched (i.e., it is active and might have
  *    active children).   Then ff->children_reducer_map is the slot for
  *    storing the reducer map from ff's leftmost child, as in the reducer
- *    protocol.   The runtime may resume execution of ff while it is not 
+ *    protocol.   The runtime may resume execution of ff while it is not
  *    synched only because of a steal.
  *    In this case, while we are resuming ff, ff->children_reducer_map
  *    may be non-NULL (because one of ff's children has completed).
  *    We resume execution of ff without changing w->reducer_map.
- */ 
+ */
 static void setup_for_execution_reducers(__cilkrts_worker *w,
                                          full_frame *ff)
 {
@@ -1483,7 +1570,7 @@ static void setup_for_execution_reducers(__cilkrts_worker *w,
     }
 }
 
-static void setup_for_execution_exceptions(__cilkrts_worker *w, 
+static void setup_for_execution_exceptions(__cilkrts_worker *w,
                                            full_frame *ff)
 {
     CILK_ASSERT(NULL == w->l->pending_exception);
@@ -1492,7 +1579,7 @@ static void setup_for_execution_exceptions(__cilkrts_worker *w,
 }
 
 #if 0 /* unused */
-static void setup_for_execution_stack(__cilkrts_worker *w, 
+static void setup_for_execution_stack(__cilkrts_worker *w,
                                       full_frame *ff)
 {
 }
@@ -1535,7 +1622,7 @@ static void setup_for_execution_pedigree(__cilkrts_worker *w)
     w->l->work_stolen = 0;
 }
 
-static void setup_for_execution(__cilkrts_worker *w, 
+static void setup_for_execution(__cilkrts_worker *w,
                                 full_frame *ff,
                                 int is_return_from_call)
 {
@@ -1569,7 +1656,7 @@ static void setup_for_execution(__cilkrts_worker *w,
  *
  * It also asserts that w, ff, and sf all have the expected properties
  * for resuming user code.
- */ 
+ */
 void scheduling_fiber_prepare_to_resume_user_code(__cilkrts_worker *w,
                                                   full_frame *ff,
                                                   __cilkrts_stack_frame *sf)
@@ -1605,7 +1692,7 @@ void scheduling_fiber_prepare_to_resume_user_code(__cilkrts_worker *w,
         /* XXX This frame could be resumed unsynched on the leftmost stack */
         CILK_ASSERT((ff->sync_master == 0 || ff->sync_master == w));
     CILK_ASSERT(w->l->frame_ff == ff);
-#endif    
+#endif
 }
 
 
@@ -1627,7 +1714,7 @@ static void enter_runtime_transition_proc(cilk_fiber *fiber)
     // In cases 1 and 2, the frame may be truly suspended or
     // may be immediately executed by this worker after provably_good_steal.
     //
-    // 
+    //
     // There is a fourth case, which can, but does not need to execute
     // this function:
     //   4. Starting up the scheduling loop on a user or
@@ -1653,7 +1740,7 @@ static void enter_runtime_transition_proc(cilk_fiber *fiber)
         // library causes a seg fault.  Since we're not supporting
         // exceptions there at this point, just don't do the check
         //
-        // TBD: Is this check also safe to do on Windows? 
+        // TBD: Is this check also safe to do on Windows?
         CILKBUG_ASSERT_NO_UNCAUGHT_EXCEPTION();
     }
 }
@@ -1702,7 +1789,7 @@ user_code_resume_after_switch_into_runtime(cilk_fiber *fiber)
     sf = w->current_stack_frame;
     ff = sf->worker->l->frame_ff;
 
-#if FIBER_DEBUG >= 1    
+#if FIBER_DEBUG >= 1
     CILK_ASSERT(ff->fiber_self == fiber);
     cilk_fiber_data *fdata = cilk_fiber_get_data(fiber);
     DBGPRINTF ("%d-%p: resume_after_switch_into_runtime, fiber=%p\n",
@@ -1752,7 +1839,7 @@ longjmp_into_runtime(__cilkrts_worker *w,
         setup_for_execution(w, ff2, 0);
         scheduling_fiber_prepare_to_resume_user_code(w, ff2, w->current_stack_frame);
         cilkrts_resume(w->current_stack_frame, ff2);
-        
+
 // Suppress clang warning that the expression result is unused
 #if defined(__clang__) && (! defined(__INTEL_COMPILER))
 #   pragma clang diagnostic push
@@ -1798,7 +1885,7 @@ longjmp_into_runtime(__cilkrts_worker *w,
     cilk_fiber_set_post_switch_proc(w->l->scheduling_fiber,
                                     enter_runtime_transition_proc);
     cilk_fiber_invoke_tbb_stack_op(current_fiber, CILK_TBB_STACK_ORPHAN);
-    
+
     if (w->l->fiber_to_free) {
         // Case 1: we are freeing this fiber.  We never
         // resume this fiber again after jumping into the runtime.
@@ -1821,7 +1908,7 @@ longjmp_into_runtime(__cilkrts_worker *w,
         // We should never come back here!
         CILK_ASSERT(0);
     }
-    else {        
+    else {
         // Case 2: We are passing the fiber to our parent because we
         // are leftmost.  We should come back later to
         // resume execution of user code.
@@ -1829,7 +1916,7 @@ longjmp_into_runtime(__cilkrts_worker *w,
         // If we are not freeing a fiber, there we must be
         // returning from a spawn or processing an exception.  The
         // "sync" path always frees a fiber.
-        // 
+        //
         // We must be the leftmost child, and by left holder logic, we
         // have already moved the current fiber into our parent full
         // frame.
@@ -1948,7 +2035,7 @@ static full_frame* check_for_work(__cilkrts_worker *w)
  *
  * Returns either when a full frame is found, or NULL if the
  * computation is done.
- */ 
+ */
 static full_frame* search_until_work_found_or_done(__cilkrts_worker *w)
 {
     full_frame *ff = NULL;
@@ -1956,7 +2043,7 @@ static full_frame* search_until_work_found_or_done(__cilkrts_worker *w)
     // or because we pull it off w's 1-element queue).
     while (!ff) {
         // Check worker state to figure out our next action.
-        switch (worker_runnable(w))    
+        switch (worker_runnable(w))
         {
         case SCHEDULE_RUN:             // One attempt at checking for work.
             ff = check_for_work(w);
@@ -1988,7 +2075,7 @@ static full_frame* search_until_work_found_or_done(__cilkrts_worker *w)
 
 /**
  * The proc method for a scheduling fiber on a user worker.
- * 
+ *
  * When a user worker jumps into the runtime, it jumps into this
  * method by either starting it if the scheduling fiber has never run
  * before, or resuming the fiber if it was previously suspended.
@@ -2020,7 +2107,7 @@ void scheduler_fiber_proc_for_user_worker(cilk_fiber *fiber)
  *    good steal.
  * 3. If no full frame is found in step 2, steal until
  *    a frame is found or we are done.  If we are done, finish
- *    the scheduling loop. 
+ *    the scheduling loop.
  * 4. When a frame is found, setup to resume user code.
  *    In particular, suspend the current fiber and resume the
  *    user fiber to execute the frame.
@@ -2030,7 +2117,7 @@ void scheduler_fiber_proc_for_user_worker(cilk_fiber *fiber)
  * this fiber.
  *
  * @pre @c current_fiber should equal @c wptr->l->scheduling_fiber
- * 
+ *
  * @param current_fiber   The currently executing (scheduling_ fiber
  * @param wptr            The currently executing worker.
  * @param return          The next fiber we should switch to.
@@ -2042,7 +2129,7 @@ static cilk_fiber* worker_scheduling_loop_body(cilk_fiber* current_fiber,
     CILK_ASSERT(current_fiber == w->l->scheduling_fiber);
 
     // Stage 1: Transition from executing user code to the runtime code.
-    // We don't need to do this call here any more, because 
+    // We don't need to do this call here any more, because
     // every switch to the scheduling fiber should make this call
     // using a post_switch_proc on the fiber.
     //
@@ -2057,7 +2144,7 @@ static cilk_fiber* worker_scheduling_loop_body(cilk_fiber* current_fiber,
 
     if (!ff) {
         // Stage 3.  We didn't find anything from our 1-element
-        // queue.  Now go through the steal loop to find work. 
+        // queue.  Now go through the steal loop to find work.
         ff = search_until_work_found_or_done(w);
         if (!ff) {
             CILK_ASSERT(w->g->work_done);
@@ -2114,7 +2201,7 @@ static cilk_fiber* worker_scheduling_loop_body(cilk_fiber* current_fiber,
     // 2. Resuming code on a steal.  In this case, since we
     //    grabbed a new fiber, resume_sf should be NULL.
     CILK_ASSERT(NULL == other_data->resume_sf);
-        
+
 #if FIBER_DEBUG >= 2
     fprintf(stderr, "W=%d: other fiber=%p, setting resume_sf to %p\n",
             w->self, other, other_data->resume_sf);
@@ -2124,7 +2211,7 @@ static cilk_fiber* worker_scheduling_loop_body(cilk_fiber* current_fiber,
     // The scheduling fiber should have the right owner from before.
     CILK_ASSERT(current_fiber_data->owner == w);
     other_data->resume_sf = sf;
-        
+
 
 #if FIBER_DEBUG >= 3
     fprintf(stderr, "ThreadId=%p (about to suspend self resume other), W=%d: current_fiber=%p, other=%p, current_fiber->resume_sf = %p, other->resume_sf = %p\n",
@@ -2189,7 +2276,7 @@ static void worker_scheduler_init_function(__cilkrts_worker *w)
  * @note Currently, only system workers finish their loops.  User
  * workers will jump away to user code without exiting their
  * scheduling loop.
- */ 
+ */
 static void worker_scheduler_terminate_function(__cilkrts_worker *w)
 {
     // A user worker should never finish by falling through the
@@ -2200,7 +2287,7 @@ static void worker_scheduler_terminate_function(__cilkrts_worker *w)
 /**
  * The main scheduler function executed by a worker's scheduling
  * fiber.
- * 
+ *
  * This method is started by either a new system worker, or a user
  * worker that has stalled and just been imported into the runtime.
  */
@@ -2209,17 +2296,17 @@ static void worker_scheduler_function(__cilkrts_worker *w)
     START_INTERVAL(w, INTERVAL_INIT_WORKER);
     worker_scheduler_init_function(w);
     STOP_INTERVAL(w, INTERVAL_INIT_WORKER);
-    
+
     // The main scheduling loop body.
 
-    while (!w->g->work_done) {    
+    while (!w->g->work_done) {
         // Execute the "body" of the scheduling loop, and figure
         // out the fiber to jump to next.
         START_INTERVAL(w, INTERVAL_SCHED_LOOP);
         cilk_fiber* fiber_to_resume
             = worker_scheduling_loop_body(w->l->scheduling_fiber, w);
         STOP_INTERVAL(w, INTERVAL_SCHED_LOOP);
-        
+
         if (fiber_to_resume) {
             // Suspend the current fiber and resume next one.
             NOTE_INTERVAL(w, INTERVAL_SUSPEND_RESUME_OTHER);
@@ -2258,7 +2345,7 @@ execute_reductions_for_spawn_return(__cilkrts_worker *w,
                                     full_frame *ff,
                                     __cilkrts_stack_frame *returning_sf);
 
-                                                             
+
 
 /*************************************************************
   Scheduler functions that are callable by client code
@@ -2285,7 +2372,7 @@ static full_frame *disown(__cilkrts_worker *w,
  * Normally, by the time we gain control in the runtime, the worker
  * has already popped off the __cilkrts_stack_frame "returning_sf"
  * from its call chain.
- * 
+ *
  * When we have only serial reductions, w->current_stack_frame is not
  * needed any more, because w is about to enter the runtime scheduling
  * loop anyway.  Similarly, the frame "ff" is slated to be destroyed
@@ -2300,7 +2387,7 @@ static full_frame *disown(__cilkrts_worker *w,
  *
  *   1. Puts returning_sf back as w's current stack frame.
  *   2. Makes "ff" runnable again on w.
- */ 
+ */
 static inline
 void restore_frame_for_spawn_return_reduction(__cilkrts_worker *w,
                                               full_frame *ff,
@@ -2351,7 +2438,7 @@ static void do_sync(__cilkrts_worker *w, full_frame *ff,
 
                 // Before switching into the scheduling fiber, we should have
                 // already taken care of deallocating the current
-                // fiber. 
+                // fiber.
                 CILK_ASSERT(NULL == ff->fiber_self);
 
                 // Update the frame's pedigree information if this is an ABI 1
@@ -2462,7 +2549,7 @@ void __cilkrts_promote_own_deque(__cilkrts_worker *w)
     // Remember the fiber we start this method on.
     CILK_ASSERT(w->l->frame_ff);
     cilk_fiber* starting_fiber = w->l->frame_ff->fiber_self;
-    
+
     BEGIN_WITH_WORKER_LOCK(w) {
         while (dekker_protocol(w)) {
             /* PLACEHOLDER_FIBER is used as non-null marker to tell detach()
@@ -2485,7 +2572,7 @@ void __cilkrts_promote_own_deque(__cilkrts_worker *w)
     // loot frame away, get a new fiber, and starting executing the
     // loot frame.
     //
-    // What should a fake thief do?  Where does the frame go? 
+    // What should a fake thief do?  Where does the frame go?
 
     // In any case, we should be finishing the promotion process with
     // the same fiber with.
@@ -2503,7 +2590,7 @@ void __cilkrts_promote_own_deque(__cilkrts_worker *w)
    to the __cilkrts_stack_frame that we are finishing (i.e., the
    argument to __cilkrts_leave_frame).
    */
-void __cilkrts_c_THE_exception_check(__cilkrts_worker *w, 
+void __cilkrts_c_THE_exception_check(__cilkrts_worker *w,
                                      __cilkrts_stack_frame *returning_sf)
 {
     full_frame *ff;
@@ -2540,13 +2627,13 @@ void __cilkrts_c_THE_exception_check(__cilkrts_worker *w,
 
             // Reverse the decrement from undo_detach.
             // This update effectively resets the deque to be
-            // empty (i.e., changes w->tail back to equal w->head). 
+            // empty (i.e., changes w->tail back to equal w->head).
             // We need to reset the deque to execute parallel
             // reductions.  When we have only serial reductions, it
             // does not matter, since serial reductions do not
             // change the deque.
             w->tail++;
-#if REDPAR_DEBUG > 1            
+#if REDPAR_DEBUG > 1
             // ASSERT our deque is empty.
             CILK_ASSERT(w->head == w->tail);
 #endif
@@ -2593,7 +2680,7 @@ void __cilkrts_c_THE_exception_check(__cilkrts_worker *w,
 
 /* Return an exception to a stolen parent. */
 NORETURN __cilkrts_exception_from_spawn(__cilkrts_worker *w,
-                                        __cilkrts_stack_frame *returning_sf) 
+                                        __cilkrts_stack_frame *returning_sf)
 {
     full_frame *ff = w->l->frame_ff;
     STOP_INTERVAL(w, INTERVAL_WORKING);
@@ -2625,7 +2712,7 @@ static void do_return_from_spawn(__cilkrts_worker *w,
         CILK_ASSERT(!ff->is_call_child);
         CILK_ASSERT(sf == NULL);
         parent_ff = ff->parent;
-    
+
         BEGIN_WITH_FRAME_LOCK(w, ff) {
             decjoin(ff);
         } END_WITH_FRAME_LOCK(w, ff);
@@ -2854,7 +2941,7 @@ void __cilkrts_c_return_from_initial(__cilkrts_worker *w)
     struct cilkred_map *rm;
 
     // When we are returning from the initial frame, switch from
-    // INTERVAL_WORKING into INTERVAL_IN_RUNTIME. 
+    // INTERVAL_WORKING into INTERVAL_IN_RUNTIME.
     STOP_INTERVAL(w, INTERVAL_WORKING);
     START_INTERVAL(w, INTERVAL_IN_RUNTIME);
 
@@ -2865,7 +2952,7 @@ void __cilkrts_c_return_from_initial(__cilkrts_worker *w)
     fprintf(stderr, "[W=%d, desc=cilkrts_c_return_from_initial, ff=%p]\n",
             w->self, w->l->frame_ff);
     #endif
-    
+
     BEGIN_WITH_WORKER_LOCK_OPTIONAL(w) {
         full_frame *ff = w->l->frame_ff;
         CILK_ASSERT(ff);
@@ -2940,11 +3027,11 @@ void __cilkrts_c_return_from_initial(__cilkrts_worker *w)
 #endif
 
     w = NULL;
-    
+
     __cilkrts_unbind_thread();
 
 #if FIBER_DEBUG >= 1
-    
+
     fprintf(stderr, "w=%p, %d: Finished unbind\n",
             tmp, tmp_id);
 #endif
@@ -3008,7 +3095,7 @@ __cilkrts_stack_frame *volatile *__cilkrts_disallow_stealing(
 }
 
 /*************************************************************
-  Initialization and startup 
+  Initialization and startup
 *************************************************************/
 
 __cilkrts_worker *make_worker(global_state_t *g,
@@ -3027,11 +3114,11 @@ __cilkrts_worker *make_worker(global_state_t *g,
     w->reducer_map = NULL;
     w->current_stack_frame = NULL;
     w->reserved = NULL;
-    
+
     w->l->worker_magic_0 = WORKER_MAGIC_0;
     w->l->team = NULL;
     w->l->type = WORKER_FREE;
-    
+
     __cilkrts_mutex_init(&w->l->lock);
     __cilkrts_mutex_init(&w->l->steal_lock);
     w->l->do_not_steal = 0;
@@ -3043,7 +3130,7 @@ __cilkrts_worker *make_worker(global_state_t *g,
         __cilkrts_malloc(g->ltqsize * sizeof(*w->l->ltq));
     w->ltq_limit = w->l->ltq + g->ltqsize;
     w->head = w->tail = w->l->ltq;
-    
+
     cilk_fiber_pool_init(&w->l->fiber_pool,
                          &g->fiber_pool,
                          g->stack_size,
@@ -3053,7 +3140,7 @@ __cilkrts_worker *make_worker(global_state_t *g,
 #if FIBER_DEBUG >= 2
     fprintf(stderr, "ThreadId=%p: Making w=%d (%p), pool = %p\n",
             cilkos_get_current_thread_id(),
-            w->self, w, 
+            w->self, w,
             &w->l->fiber_pool);
 #endif
     w->l->scheduling_fiber = NULL;
@@ -3070,7 +3157,7 @@ __cilkrts_worker *make_worker(global_state_t *g,
     __cilkrts_init_stats(w->l->stats);
 #else
     w->l->stats = NULL;
-#endif    
+#endif
     w->l->steal_failure_count = 0;
 
     w->l->work_stolen = 0;
@@ -3089,14 +3176,28 @@ __cilkrts_worker *make_worker(global_state_t *g,
     // Nothing's been stolen yet
     w->l->worker_magic_1 = WORKER_MAGIC_1;
 
-    /*w->parallelism_disabled = 0;*/
+#ifndef BIN_METHOD
+	// Intitalize locality aware stealing
+	w->l->locality_steal_attempt = 0;
+#endif
+	w->l->local_min_worker = ((int)(self / w->g->workers_per_socket)) * w->g->workers_per_socket;
+
+	w->l->higher_neighbor_min_worker = (w->l->local_min_worker + w->g->workers_per_socket) % (w->g->workers_per_socket * w->g->num_sockets);
+
+	w->l->lower_neighbor_min_worker = (w->l->local_min_worker - w->g->workers_per_socket) % (w->g->workers_per_socket * w->g->num_sockets);
+
+#ifdef BIN_METHOD
+	w->l->remote_neighbor_min_worker = (w->l->higher_neighbor_min_worker + w->g->workers_per_socket) % (w->g->workers_per_socket * w->g->num_sockets);
+#endif
+
+	/*w->parallelism_disabled = 0;*/
 
     // Allow stealing all frames. Sets w->saved_protected_tail
     __cilkrts_restore_stealing(w, w->ltq_limit);
-    
+
     __cilkrts_init_worker_sysdep(w);
 
-    reset_THE_exception(w); 
+    reset_THE_exception(w);
 
     return w;
 }
@@ -3111,7 +3212,7 @@ void destroy_worker(__cilkrts_worker *w)
         // The scheduling fiber is the main fiber for system workers and must
         // be deallocated by the thread that created it.  Thus, we can
         // deallocate only free workers' (formerly user workers) scheduling
-        // fibers here. 
+        // fibers here.
         CILK_ASSERT(WORKER_FREE == w->l->type);
 
 #if FIBER_DEBUG >=1
@@ -3134,7 +3235,7 @@ void destroy_worker(__cilkrts_worker *w)
 #else
     CILK_ASSERT(NULL == w->l->stats);
 #endif
-    
+
     /* Free any cached fibers. */
     cilk_fiber_pool_destroy(&w->l->fiber_pool);
 
@@ -3328,8 +3429,8 @@ static void init_workers(global_state_t *g)
     // like Inspector which run multithreaded and need to know the memory
     // range for all the workers that will be accessed in a user's program
     workers_memory = (struct buffered_worker*)
-        __cilkrts_malloc(sizeof(*workers_memory) * total_workers);    
-    
+        __cilkrts_malloc(sizeof(*workers_memory) * total_workers);
+
     // Notify any tools that care (Cilkscreen and Inspector) that they should
     // ignore memory allocated for the workers
     __cilkrts_cilkscreen_ignore_block(&workers_memory[0],
@@ -3376,7 +3477,7 @@ void __cilkrts_init_internal(int start)
             // Cilkview) then there's only one worker and we need to tell
             // the tool about the extent of the stack
             if (g->under_ptool)
-                __cilkrts_establish_c_stack();     
+                __cilkrts_establish_c_stack();
             init_workers(g);
 
             // Initialize per-work record/replay logging
@@ -3438,7 +3539,7 @@ void __cilkrts_init_internal(int start)
     Case A: Return from a spawn with a stolen parent.
       Consider a spawned function g is returning on a worker w.
       Assume:
-          -   g was spawned from a parent function f.  
+          -   g was spawned from a parent function f.
           -   ff is the full frame for g's spawn helper
           -   sf be the __cilkrts_stack_frame for g's spawn helper.
 
@@ -3456,7 +3557,7 @@ void __cilkrts_init_internal(int start)
 
               (a) w has ff as its full frame,
               (b) w has sf as its __cilkrts_stack_frame, and
-              (c) w has an empty deque. 
+              (c) w has an empty deque.
 
           If the runtime satisfies these properties, then if w
           encounters a spawn in a parallel reduction, it can push onto
@@ -3465,7 +3566,7 @@ void __cilkrts_init_internal(int start)
 
         - In actual control flow, however, once the
           "execute_reductions()" function returns, it is actually
-          returning to runtime code instead of g's spawn helper. 
+          returning to runtime code instead of g's spawn helper.
 
           At the point a worker w began executing reductions, the
           control flow / compiled code had already finished g's spawn
@@ -3493,7 +3594,7 @@ void __cilkrts_init_internal(int start)
            (a) Frees the user stack we were just on if it is no longer needed.
            (b) Decrement the join counter on ff->parent, and tries to do a
                provably good steal.
-           (c) Clean up the full frame ff. 
+           (c) Clean up the full frame ff.
 
 
    Case B: Stalling at a sync.
@@ -3508,7 +3609,7 @@ void __cilkrts_init_internal(int start)
 
      The reduction logic for this case is similar to Case A.
 
-       B1. Restore the runtime data structures. 
+       B1. Restore the runtime data structures.
 
            The main difference from Case A is that ff/sf is still a
            frame that needs to be executed later (since it is stalling
@@ -3613,7 +3714,7 @@ splice_left_ptrs compute_left_ptrs_for_sync(__cilkrts_worker *w,
  *
  *      w->l->fiber_to_free holds any stack that needs to be freed
  *      when control switches into the runtime fiber.
- * 
+ *
  *   2. Unlink and remove child_ff from the tree of full frames.
  *
  * @param   w          The currently executing worker.
@@ -3676,9 +3777,9 @@ void finish_spawn_return_on_user_stack(__cilkrts_worker *w,
  * @param   w    The currently executing worker.
  * @param   ff   The full frame returning from a spawn.
  * @return  NULL if we finished all reductions.
- * @return  The address where the left map is stored (which should be passed to 
+ * @return  The address where the left map is stored (which should be passed to
  *          slow_path_reductions_for_spawn_return()) if there are
- *          still reductions to execute. 
+ *          still reductions to execute.
  */
 struct cilkred_map**
 fast_path_reductions_for_spawn_return(__cilkrts_worker *w,
@@ -3692,7 +3793,7 @@ fast_path_reductions_for_spawn_return(__cilkrts_worker *w,
     // Figure out the pointers to the left where I want
     // to put reducers and exceptions.
     left_ptrs = compute_left_ptrs_for_spawn_return(w, ff);
-    
+
     // Go ahead and merge exceptions while holding the lock.
     splice_exceptions_for_spawn(w, ff, left_ptrs.exception_ptr);
 
@@ -3715,7 +3816,7 @@ fast_path_reductions_for_spawn_return(__cilkrts_worker *w,
     //
     // The goal of the code below is to execute the fast path with
     // as few branches and writes as possible.
-    
+
     int case_value = (*(left_ptrs.map_ptr) != NULL);
     case_value += ((w->reducer_map != NULL) << 1);
     case_value += ((ff->right_reducer_map != NULL) << 2);
@@ -3770,7 +3871,7 @@ fast_path_reductions_for_spawn_return(__cilkrts_worker *w,
  * We have not, however, decremented the join counter on ff->parent,
  * so no one can resume execution of the parent yet.
  *
- * WARNING: 
+ * WARNING:
  *   This method assumes the lock on ff->parent is held upon entry, and
  *   Upon exit, the worker that returns still holds a lock on ff->parent
  *   This method can, however, release and reacquire the lock on ff->parent.
@@ -3778,8 +3879,8 @@ fast_path_reductions_for_spawn_return(__cilkrts_worker *w,
  * @param w             The currently executing worker.
  * @param ff            The full frame returning from a spawn.
  * @param left_map_ptr  Pointer to our initial left map.
- * @return              The worker that this method returns on. 
- */ 
+ * @return              The worker that this method returns on.
+ */
 static __cilkrts_worker*
 slow_path_reductions_for_spawn_return(__cilkrts_worker *w,
                                       full_frame *ff,
@@ -3799,7 +3900,7 @@ slow_path_reductions_for_spawn_return(__cilkrts_worker *w,
     //   3. All maps should be slid over left by one, if possible.
     //   4. All exceptions should be merged so far.
     while (1) {
-        
+
         // Slide middle map left if possible.
         if (!(*left_map_ptr)) {
             *left_map_ptr = w->reducer_map;
@@ -3831,7 +3932,7 @@ slow_path_reductions_for_spawn_return(__cilkrts_worker *w,
             w->reducer_map = NULL;
             right_map = ff->right_reducer_map;
             ff->right_reducer_map = NULL;
-        
+
             // WARNING!!! Lock release here.
             // We have reductions to execute (and we can't hold locks).
             __cilkrts_frame_unlock(w, ff->parent);
@@ -3853,7 +3954,7 @@ slow_path_reductions_for_spawn_return(__cilkrts_worker *w,
             CILK_ASSERT(NULL == w->reducer_map);
             // Put the final answer back into w->reducer_map.
             w->reducer_map = left_map;
-            
+
             // Save any exceptions generated because of the reduction
             // process from the returning worker.  These get merged
             // the next time around the loop.
@@ -3879,7 +3980,7 @@ slow_path_reductions_for_spawn_return(__cilkrts_worker *w,
         }
     }
     // We should never break out of this loop.
-    
+
     CILK_ASSERT(0);
     return NULL;
 }
@@ -3891,21 +3992,21 @@ slow_path_reductions_for_spawn_return(__cilkrts_worker *w,
  * been stolen.
  *
  * Execution may start on w, but may finish on a different worker.
- * This method acquires/releases the lock on ff->parent. 
+ * This method acquires/releases the lock on ff->parent.
  *
  * @param w            The currently executing worker.
  * @param ff           The full frame of the spawned function that is returning.
  * @param returning_sf The __cilkrts_stack_frame for this returning function.
- * @return             The worker returning from this method. 
- */ 
+ * @return             The worker returning from this method.
+ */
 static __cilkrts_worker*
 execute_reductions_for_spawn_return(__cilkrts_worker *w,
                                     full_frame *ff,
                                     __cilkrts_stack_frame *returning_sf)
-{ 
+{
     // Step A1 from reducer protocol described above.
     //
-    // Coerce the runtime into thinking that 
+    // Coerce the runtime into thinking that
     // ff/returning_sf are still on the bottom of
     // w's deque.
     restore_frame_for_spawn_return_reduction(w, ff, returning_sf);
@@ -3929,7 +4030,7 @@ execute_reductions_for_spawn_return(__cilkrts_worker *w,
             verify_current_wkr(w);
         }
 
-        finish_spawn_return_on_user_stack(w, ff->parent, ff);      
+        finish_spawn_return_on_user_stack(w, ff->parent, ff);
         // WARNING: the use of this lock macro is deceptive.
         // The worker may have changed here.
     } END_WITH_FRAME_LOCK(w, ff->parent);
@@ -3945,7 +4046,7 @@ execute_reductions_for_spawn_return(__cilkrts_worker *w,
  * @param   ff The full frame stalling at a sync.
  * @return  1 if we are finished with all reductions after calling this method.
  * @return  0 if we still need to execute the slow path reductions.
- */ 
+ */
 static inline
 int fast_path_reductions_for_sync(__cilkrts_worker *w,
                                   full_frame *ff) {
@@ -3978,7 +4079,7 @@ slow_path_reductions_for_sync(__cilkrts_worker *w,
 {
     struct cilkred_map *left_map;
     struct cilkred_map *middle_map;
-    
+
 #if (REDPAR_DEBUG > 0)
     CILK_ASSERT(ff);
     CILK_ASSERT(w->head == w->tail);
@@ -3987,17 +4088,17 @@ slow_path_reductions_for_sync(__cilkrts_worker *w,
     middle_map = w->reducer_map;
     w->reducer_map = NULL;
 
-    // Loop invariant: middle_map should be valid (the current map to reduce). 
+    // Loop invariant: middle_map should be valid (the current map to reduce).
     //                 left_map is junk.
     //                 w->reducer_map == NULL.
     while (1) {
         BEGIN_WITH_FRAME_LOCK(w, ff) {
             splice_left_ptrs left_ptrs = compute_left_ptrs_for_sync(w, ff);
-            
+
             // Grab the "left" map and store pointers to those locations.
             left_map = *(left_ptrs.map_ptr);
             *(left_ptrs.map_ptr) = NULL;
-            
+
             // Slide the maps in our struct left as far as possible.
             if (!left_map) {
                 left_map = middle_map;
@@ -4029,7 +4130,7 @@ slow_path_reductions_for_sync(__cilkrts_worker *w,
         // WORKING again.
         STOP_INTERVAL(w, INTERVAL_IN_RUNTIME);
         START_INTERVAL(w, INTERVAL_WORKING);
-        
+
         // If we get here, we have a nontrivial reduction to execute.
         middle_map = repeated_merge_reducer_maps(&w,
                                                  left_map,
@@ -4046,7 +4147,7 @@ slow_path_reductions_for_sync(__cilkrts_worker *w,
         ff->pending_exception = w->l->pending_exception;
         w->l->pending_exception = NULL;
     }
-    
+
     // We should never break out of the loop above.
     CILK_ASSERT(0);
     return NULL;
@@ -4063,7 +4164,7 @@ slow_path_reductions_for_sync(__cilkrts_worker *w,
  * @param ff         The full frame of the spawned function at the sync
  * @param sf_at_sync The __cilkrts_stack_frame stalling at a sync
  * @return           The worker returning from this method.
- */ 
+ */
 static __cilkrts_worker*
 execute_reductions_for_sync(__cilkrts_worker *w,
                             full_frame *ff,
@@ -4081,9 +4182,9 @@ execute_reductions_for_sync(__cilkrts_worker *w,
     //
     // The "disown" will mark the frame "sf_at_sync"
     // as stolen and suspended, and save its place on the stack,
-    // so it can be resumed after the sync. 
+    // so it can be resumed after the sync.
     //
-    // The difference is, that we don't want the disown to 
+    // The difference is, that we don't want the disown to
     // break the following connections yet, since we are
     // about to immediately make sf/ff runnable again anyway.
     //   sf_at_sync->worker == w
@@ -4119,7 +4220,7 @@ execute_reductions_for_sync(__cilkrts_worker *w,
     // Step B2: Execute reductions on user stack.
     // Check if we have any "real" reductions to do.
     finished_reductions = fast_path_reductions_for_sync(w, ff);
-    
+
     if (!finished_reductions) {
         // Still have some real reductions to execute.
         // Run them here.
@@ -4138,7 +4239,7 @@ execute_reductions_for_sync(__cilkrts_worker *w,
 #endif
 
     // Now we suspend the frame ff (since we've
-    // finished the reductions).  Roughly, we've split apart the 
+    // finished the reductions).  Roughly, we've split apart the
     // "make_unrunnable" call here --- we've already saved the
     // stack info earlier before the reductions execute.
     // All that remains is to restore the call stack back into the

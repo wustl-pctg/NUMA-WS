@@ -4,11 +4,11 @@
  *
  *  Copyright (C) 2009-2015, Intel Corporation
  *  All rights reserved.
- *  
+ *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted provided that the following conditions
  *  are met:
- *  
+ *
  *    * Redistributions of source code must retain the above copyright
  *      notice, this list of conditions and the following disclaimer.
  *    * Redistributions in binary form must reproduce the above copyright
@@ -18,7 +18,7 @@
  *    * Neither the name of Intel Corporation nor the names of its
  *      contributors may be used to endorse or promote products derived
  *      from this software without specific prior written permission.
- *  
+ *
  *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -31,9 +31,9 @@
  *  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY
  *  WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
- *  
+ *
  *  *********************************************************************
- *  
+ *
  *  PLEASE NOTE: This file is a downstream copy of a file mainitained in
  *  a repository at cilkplus.org. Changes made to this file that are not
  *  submitted through the contribution process detailed at
@@ -42,7 +42,7 @@
  *  GNU compiler collection or posted to the git repository at
  *  https://bitbucket.org/intelcilkplusruntime/itnel-cilk-runtime.git are
  *  not tracked.
- *  
+ *
  *  We welcome your contributions to this open source project. Thank you
  *  for your assistance in helping us improve Cilk Plus.
  **************************************************************************/
@@ -55,6 +55,7 @@
 #include "cilk/cilk_api.h"
 #include "cilk_malloc.h"
 #include "record-replay.h"
+#include "numa.h"
 
 #include <algorithm>  // For max()
 #include <cstring>
@@ -90,7 +91,7 @@ static global_state_t global_state_singleton =
 // Variables that need to export C-style names
 extern "C"
 {
-    // Pointer to the global state singleton.  
+    // Pointer to the global state singleton.
     global_state_t *cilkg_singleton_ptr = NULL;
 
     // __cilkrts_global_state is exported and referenced by the debugger.
@@ -180,16 +181,16 @@ int store_bool(INT_T *out, const CHAR_T *val)
     static const char* const s_one   = "1";
     static const char* const s_true  = "true";
     static const char* const s_false = "false";
-    
+
     if (val == 0)
         return __CILKRTS_SET_PARAM_INVALID;
 
-    if (strmatch(s_false, val) || strmatch(s_zero, val)) { 
+    if (strmatch(s_false, val) || strmatch(s_zero, val)) {
         *out = 0;
         return __CILKRTS_SET_PARAM_SUCCESS;
     }
 
-    if (strmatch(s_true, val) || strmatch(s_one, val)) { 
+    if (strmatch(s_true, val) || strmatch(s_one, val)) {
         *out = 1;
         return __CILKRTS_SET_PARAM_SUCCESS;
     }
@@ -342,7 +343,7 @@ int set_param_imp(global_state_t* g, const CHAR_T* param, const CHAR_T* value)
         // g->stack_size so that a call to get stack size will return
         // the value that the runtime will actually use.
         g->stack_size = cilkos_validate_stack_size(g->stack_size);
-        return ret;     
+        return ret;
     }
 
 
@@ -412,7 +413,6 @@ global_state_t* cilkg_get_user_settable_values()
         g->P                        = hardware_cpu_count;   // Defaults to hardware CPU count
         // g->max_user_workers         = 0;   // 0 unless set by user
         g->fiber_pool_size          = 7;   // Arbitrary default
-        
         g->global_fiber_pool_size   = 3 * 3* g->P;  // Arbitrary default
         // 3*P was the default size of the worker array (including
         // space for extra user workers).  This parameter was chosen
@@ -432,7 +432,7 @@ global_state_t* cilkg_get_user_settable_values()
         // small values of P, I recall seeing a few microbenchmarks
         // (e.g., fib) where a limit of 10*P seemed to be
         // unnecessarily slowing things down.
-        // 
+        //
         // That being said, the code has changed sufficiently that
         // this observation may no longer be true.
         //
@@ -507,11 +507,69 @@ global_state_t* cilkg_get_user_settable_values()
             }
         }
 #endif
-        
+
         cilkg_user_settable_values_initialized = true;
     }
 
+    /**
+     * Locality Global Variables
+     */
+    g->num_sockets = 4; // assume 4 socket machine
+    g->workers_per_socket = 8; // assume 8 cores per socket 
+
+    if (cilkos_getenv(envstr, sizeof(envstr), "CILK_NUM_SOCKETS"))
+        // Limit to no less than 1 and no more than 4
+        store_int(&g->num_sockets, envstr, 1, 4);
+
+    if (cilkos_getenv(envstr, sizeof(envstr), "CILK_WORKERS_PER_SOCKET"))
+        // Limit to no less than 1 and no more than 4
+        store_int(&g->workers_per_socket, envstr, 1, 8);
+
+    //set the number of workers now
+    g->P = g->num_sockets * g->workers_per_socket;
+
+
+#ifdef BIN_METHOD
+    // Initialize locality variables
+    g->local_percent = 50;
+    g->neighbor_percent = 33;
+    g->remote_percent = 17;
+
+    //Environment variables for locality
+    if (cilkos_getenv(envstr, sizeof(envstr), "CILK_LOCAL_PERCENT"))
+        // Limit to 0 to 100 percent
+        store_int(&g->local_percent, envstr, 0, 100);
+
+    if (cilkos_getenv(envstr, sizeof(envstr), "CILK_NEIGHBOR_PERCENT"))
+        // Limit to 0 to 100 percent
+        store_int(&g->neighbor_percent, envstr, 0, 100);
+
+    if (cilkos_getenv(envstr, sizeof(envstr), "CILK_REMOTE_PERCENT"))
+        // Limit to 0 to 100 percent
+        store_int(&g->remote_percent, envstr, 0, 100);
+
+    if(g->num_sockets == 1) {
+        printf("WARNING: You are using 1 socket. CILK_REMOTE_PERCENT and CILK_NEIGHBOR_PERCENT is ignored!\n");
+        g->remote_percent = 0;
+        g->neighbor_percent = 0;
+    } else if (g->num_sockets == 2) {
+        printf("WARNING: You are using 2 sockets. CILK_REMOTE_PERCENT is ignored!\n");
+        g->remote_percent = 0;
+    }
+#endif
+
+#ifndef BIN_METHOD
+    // Initialize locality variables
+    g->locality_ratio = 2; // 2 for equal likelyhood
+
+    // Environment variables for locality
+    if (cilkos_getenv(envstr, sizeof(envstr), "CILK_LOCALITY_RATIO"))
+        // Limit to no less than 2 (50/50) and no more than 10000
+        store_int(&g->locality_ratio, envstr, 2, 10000);
+#endif
+
     return g;
+
 }
 
 int cilkg_calc_total_workers()
@@ -561,7 +619,7 @@ global_state_t* cilkg_init_global_state()
         if (g->fiber_pool_size <= 0) {
             g->fiber_pool_size = 1;
         }
-        
+
         if ((int)g->max_stacks < g->P)
             g->max_stacks = g->P;
 
@@ -589,7 +647,7 @@ global_state_t* cilkg_init_global_state()
     return g;
 }
 
-void cilkg_publish_global_state(global_state_t* g) 
+void cilkg_publish_global_state(global_state_t* g)
 {
     // TBD: which one of these needs to be executed first?  I say
     // cilkg_singleton_ptr needs to be set last, with a mfence in
