@@ -12,6 +12,7 @@ __cilkrts_disable_nonlocal_steal
 __cilkrts_enable_nonlocal_steal
 ___cilkrts_set_pinning_info
 ___cilkrts_unset_pinning_info
+___cilkrts_num_sockets
 ___cilkrts_dump_stats
 ___cilkrts_end_cilk
 ___cilkrts_enter_frame

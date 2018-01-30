@@ -4,11 +4,11 @@
  *
  *  Copyright (C) 2010-2015, Intel Corporation
  *  All rights reserved.
- *  
+ *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted provided that the following conditions
  *  are met:
- *  
+ *
  *    * Redistributions of source code must retain the above copyright
  *      notice, this list of conditions and the following disclaimer.
  *    * Redistributions in binary form must reproduce the above copyright
@@ -18,7 +18,7 @@
  *    * Neither the name of Intel Corporation nor the names of its
  *      contributors may be used to endorse or promote products derived
  *      from this software without specific prior written permission.
- *  
+ *
  *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -31,9 +31,9 @@
  *  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY
  *  WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
- *  
+ *
  *  *********************************************************************
- *  
+ *
  *  PLEASE NOTE: This file is a downstream copy of a file mainitained in
  *  a repository at cilkplus.org. Changes made to this file that are not
  *  submitted through the contribution process detailed at
@@ -42,7 +42,7 @@
  *  GNU compiler collection or posted to the git repository at
  *  https://bitbucket.org/intelcilkplusruntime/itnel-cilk-runtime.git are
  *  not tracked.
- *  
+ *
  *  We welcome your contributions to this open source project. Thank you
  *  for your assistance in helping us improve Cilk Plus.
  *
@@ -487,7 +487,7 @@ CILK_ABI_WORKER_PTR BIND_THREAD_RTN(void)
 
         cilk_fiber_set_owner(ff->fiber_self, w);
         cilk_fiber_tbb_interop_use_saved_stack_op_info(ff->fiber_self);
-	
+
         CILK_ASSERT(ff->join_counter == 0);
         ff->join_counter = 1;
         w->l->frame_ff = ff;
@@ -527,7 +527,7 @@ CILK_ABI_WORKER_PTR BIND_THREAD_RTN(void)
             cilk_fiber_set_owner(w->l->scheduling_fiber, w);
         } STOP_INTERVAL(w, INTERVAL_FIBER_ALLOCATE);
     }
-    
+
     // If the scheduling fiber is NULL, we've either exceeded our quota for
     // fibers or workers or we're out of memory, so we should lose parallelism
     // by disallowing stealing.
@@ -623,7 +623,7 @@ CILK_API_VOID __cilkrts_dump_stats(void)
     }
     else {
 	__cilkrts_bug("Attempting to report Cilk stats before the runtime has started\n");
-    }    
+    }
     global_os_mutex_unlock();
 }
 
@@ -681,7 +681,7 @@ static __cilk_tbb_retcode __cilkrts_unwatch_stack(void *data)
     o.data = NULL;
     o.routine = NULL;
     cilk_fiber_set_stack_op((cilk_fiber*)data, o);
-    
+
     // Note. Do *NOT* free any saved stack information here.   If they want to
     // free the saved stack op information, they'll do it when the thread is
     // unbound
@@ -694,7 +694,7 @@ static __cilk_tbb_retcode __cilkrts_unwatch_stack(void *data)
  *
  * Called by TBB, defined by Cilk.
  *
- * Requests that Cilk invoke the stack op routine when it orphans a stack. 
+ * Requests that Cilk invoke the stack op routine when it orphans a stack.
  * Cilk sets *u to a thunk that TBB should call when it is no longer interested
  * in watching the stack.
  */
@@ -719,7 +719,7 @@ __cilkrts_watch_stack(__cilk_tbb_unwatch_thunk *u,
         // Save data for later.  We'll deal with it when/if this thread binds
         // to the runtime
         cilk_fiber_tbb_interop_save_stack_op_info(o);
-        
+
         u->routine = __cilkrts_unwatch_stack;
         u->data = TBB_INTEROP_DATA_DELAYED_UNTIL_BIND;
 
@@ -787,7 +787,7 @@ CILK_ABI_VOID __cilkrts_set_pinning_info(int32_t socket_id) {
     CILK_ASSERT(w != NULL);
     __cilkrts_stack_frame *sf = w->current_stack_frame;
     CILK_ASSERT(sf != NULL);
-    
+
     sf->flags |= CILK_FRAME_WITH_DESIGNATED_SOCKET;
     sf->size = socket_id;
 }
@@ -813,6 +813,12 @@ CILK_ABI_VOID __cilkrts_enable_nonlocal_steal() {
     CILK_ASSERT(w != NULL);
     w->g->disable_nonlocal_steal = 0;
     __cilkrts_fence();
+}
+
+CILK_API_INT __cilk_num_sockets() {
+    __cilkrts_worker *w = __cilkrts_get_tls_worker();
+    CILK_ASSERT(w != NULL);
+    return w->g->num_sockets;
 }
 
 CILK_API_INT
@@ -845,21 +851,21 @@ __cilkrts_save_fp_ctrl_state(__cilkrts_stack_frame *sf)
     sysdep_save_fp_ctrl_state(sf);
 }
 
-/**                                                                             
- * Update pedigree for a worker when passing cilk_sync successfully             
- * 
- * We have just passed a cilk_sync successfully (the sync can be trivial or     
- * non-trivial, excepting or not-excepting), and we need to update the          
- * pedigrees rank stored in the worker.  This code used to be inlined in        
- * the compiled user code, but since we are modifying the shadow frame          
- * to store a pointer to a deque instead of a pointer to a worker, this         
- * code can no longer be inlined when the Cilk Plus code is executed by         
- * this runtime.                                                                
+/**
+ * Update pedigree for a worker when passing cilk_sync successfully
+ *
+ * We have just passed a cilk_sync successfully (the sync can be trivial or
+ * non-trivial, excepting or not-excepting), and we need to update the
+ * pedigrees rank stored in the worker.  This code used to be inlined in
+ * the compiled user code, but since we are modifying the shadow frame
+ * to store a pointer to a deque instead of a pointer to a worker, this
+ * code can no longer be inlined when the Cilk Plus code is executed by
+ * this runtime.
  **/
 CILK_ABI_VOID update_pedigree_after_sync(__cilkrts_stack_frame *sf)
 {
-    // Update the worker's pedigree information if this is an ABI 1 or later    
-    // frame                                                                    
+    // Update the worker's pedigree information if this is an ABI 1 or later
+    // frame
     __cilkrts_worker *w = sf->worker;
     if (CILK_FRAME_VERSION_VALUE(sf->flags) >= 1) {
         ++(w->pedigree.rank);
