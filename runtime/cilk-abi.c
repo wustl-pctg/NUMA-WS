@@ -815,10 +815,10 @@ CILK_ABI_VOID __cilkrts_enable_nonlocal_steal() {
     __cilkrts_fence();
 }
 
-CILK_API_INT __cilk_num_sockets() {
-    __cilkrts_worker *w = __cilkrts_get_tls_worker();
-    CILK_ASSERT(w != NULL);
-    return w->g->num_sockets;
+CILK_API_INT __cilkrts_num_sockets() {
+    global_state_t *g = cilkg_get_global_state();
+    CILK_ASSERT(g != NULL);
+    return g->num_sockets;
 }
 
 CILK_API_INT
