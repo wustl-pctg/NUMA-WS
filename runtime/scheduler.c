@@ -505,6 +505,7 @@ static void set_sync_master(__cilkrts_worker *w, full_frame *ff)
  */
 static void unset_sync_master(__cilkrts_worker *w, full_frame *ff)
 {
+    CILK_ASSERT(w != NULL);
     CILK_ASSERT(WORKER_USER == w->l->type);
     CILK_ASSERT(ff->sync_master == w);
     ff->sync_master = NULL;
@@ -890,6 +891,13 @@ check_frame_for_designated_socket(__cilkrts_worker *w, full_frame *ff) {
 
     ASSERT_WORKER_LOCK_OWNED(w);
     CILK_ASSERT(ff && w->l->next_frame_ff == ff);
+    
+    /*
+    if(ff == NULL) {
+        printf("Pusing a NULL frame!");
+    } else {
+        printf("Pushing frame: %p\n", ff);
+    }*/
 
     __cilkrts_stack_frame *sf = w->l->next_frame_ff->call_stack;
 
@@ -914,6 +922,7 @@ check_frame_for_designated_socket(__cilkrts_worker *w, full_frame *ff) {
                 CILK_ASSERT(fiber);
                 ff->fiber_self = fiber;
                 cilk_fiber_reset_state(fiber, fiber_proc_to_resume_user_code_for_random_steal);
+                //JD XXX wrong way to set team, can cause race
                 w_to_push->l->team = w->l->team;
                 w->l->team = NULL;
             }
@@ -940,7 +949,7 @@ static void check_frame_for_sync_master(__cilkrts_worker *w, full_frame *ff) {
         // the frame is if the original user worker is spinning without
         // work.
 
-        unset_sync_master(w->l->team, ff);
+        unset_sync_master(w, ff);
         if(w->l->team != w) {
             while(worker_trylock_other(w, w->l->team)==0) 
                 ; // spin-wit until lock acquire; should be rare
