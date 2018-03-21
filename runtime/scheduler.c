@@ -505,7 +505,6 @@ static void set_sync_master(__cilkrts_worker *w, full_frame *ff)
  */
 static void unset_sync_master(__cilkrts_worker *w, full_frame *ff)
 {
-    printf("worker is %d\n", w->self);
     CILK_ASSERT(WORKER_USER == w->l->type);
     CILK_ASSERT(ff->sync_master == w);
     ff->sync_master->l->last_full_frame = NULL;
@@ -923,7 +922,6 @@ check_frame_for_designated_socket(__cilkrts_worker *w, full_frame *ff) {
                 CILK_ASSERT(fiber);
                 ff->fiber_self = fiber;
                 cilk_fiber_reset_state(fiber, fiber_proc_to_resume_user_code_for_random_steal);
-                //JD XXX wrong way to set team, can cause race
             }
             worker_unlock_other(w, w_to_push);
             return w_to_push;
@@ -1090,8 +1088,6 @@ static void random_steal(__cilkrts_worker *w)
     /* If the user has disabled stealing (using the debugger) we fail */
     if (__builtin_expect(w->g->stealing_disabled, 0))
         return;
-
-    CILK_ASSERT(w->l->type == WORKER_SYSTEM);
 
     /* If there is only one processor work can still be stolen.
        There must be only one worker to prevent stealing. */
@@ -2127,7 +2123,6 @@ static cilk_fiber* worker_scheduling_loop_body(cilk_fiber* current_fiber,
 
     // Stage 2.  First do a quick check of our 1-element queue.
     full_frame *ff = pop_next_frame(w);
-    CILK_ASSERT(ff == NULL);
 
     if (!ff) {
         // Stage 3.  We didn't find anything from our 1-element
