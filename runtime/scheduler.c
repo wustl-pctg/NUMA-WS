@@ -505,11 +505,12 @@ static void set_sync_master(__cilkrts_worker *w, full_frame *ff)
  */
 static void unset_sync_master(__cilkrts_worker *w, full_frame *ff)
 {
-    CILK_ASSERT(w != NULL);
+    printf("worker is %d\n", w->self);
     CILK_ASSERT(WORKER_USER == w->l->type);
     CILK_ASSERT(ff->sync_master == w);
+    ff->sync_master->last_full_frame = NULL;
     ff->sync_master = NULL;
-    w->l->last_full_frame = NULL;
+    // w->l->last_full_frame = NULL;
 }
 
 /********************************************************************
@@ -949,13 +950,15 @@ static void check_frame_for_sync_master(__cilkrts_worker *w, full_frame *ff) {
         // the frame is if the original user worker is spinning without
         // work.
 
-        unset_sync_master(w->l->team, ff);
-        if(w->l->team != w) {
-            while(worker_trylock_other(w, w->l->team)==0) 
+        __cilkrts_worker *sync_master = ff->sync_master;
+        CILK_ASSERT(ff->sync_master == w->l->team);
+        unset_sync_master(sync_master, ff);
+        if(sync_master != w) {
+            while(worker_trylock_other(w, sync_master)==0) 
                 ; // spin-wit until lock acquire; should be rare
-            ASSERT_WORKER_LOCK_OWNED(w->l->team);
-            transfer_next_frame(w, w->l->team);
-            worker_unlock_other(w, w->l->team);
+            ASSERT_WORKER_LOCK_OWNED(sync_master);
+            transfer_next_frame(w, sync_master);
+            worker_unlock_other(w, sync_master);
         }
     }
 }
@@ -2137,6 +2140,7 @@ static cilk_fiber* worker_scheduling_loop_body(cilk_fiber* current_fiber,
 
     // Stage 2.  First do a quick check of our 1-element queue.
     full_frame *ff = pop_next_frame(w);
+    CILK_ASSERT(ff == NULL || w->l->team != NULL);
 
     if (!ff) {
         // Stage 3.  We didn't find anything from our 1-element
@@ -2145,6 +2149,8 @@ static cilk_fiber* worker_scheduling_loop_body(cilk_fiber* current_fiber,
         if (!ff) {
             CILK_ASSERT(w->g->work_done);
             return NULL;
+        } else {
+            CILK_ASSERT(w->l->team != NULL);
         }
     }
 
@@ -2723,6 +2729,7 @@ static void do_return_from_spawn(__cilkrts_worker *w,
         // provably good steal successful; at this point, we have
         // ownership on frame_ff
         if(steal_result == CONTINUE_EXECUTION) {
+            //JD XXX is this right?
             if(check_frame_for_designated_socket(w, parent_ff) == w) { 
                 // if not pinned on designated socket, check the sync master
                 check_frame_for_sync_master(w, parent_ff);
@@ -4257,6 +4264,5 @@ execute_reductions_for_sync(__cilkrts_worker *w,
   Local Variables: **
   c-file-style:"bsd" **
   c-basic-offset:4 **
-  indent-tabs-mode:nil **
   End: **
 */

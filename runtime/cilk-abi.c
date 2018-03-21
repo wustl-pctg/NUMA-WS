@@ -472,6 +472,8 @@ CILK_ABI_WORKER_PTR BIND_THREAD_RTN(void)
         __cilkrts_bug("Attempt to enter Cilk while Cilk is shutting down");
     w = find_free_worker(g);
     CILK_ASSERT(w);
+    CILK_ASSERT(w->self == 0);
+    CILK_ASSERT(w->l->my_socket_id == 0);
 
     __cilkrts_set_tls_worker(w);
     __cilkrts_cilkscreen_establish_worker(w);
