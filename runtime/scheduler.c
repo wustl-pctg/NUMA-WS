@@ -949,7 +949,7 @@ static void check_frame_for_sync_master(__cilkrts_worker *w, full_frame *ff) {
         // the frame is if the original user worker is spinning without
         // work.
 
-        unset_sync_master(w, ff);
+        unset_sync_master(w->l->team, ff);
         if(w->l->team != w) {
             while(worker_trylock_other(w, w->l->team)==0) 
                 ; // spin-wit until lock acquire; should be rare
