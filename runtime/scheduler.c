@@ -508,7 +508,7 @@ static void unset_sync_master(__cilkrts_worker *w, full_frame *ff)
     printf("worker is %d\n", w->self);
     CILK_ASSERT(WORKER_USER == w->l->type);
     CILK_ASSERT(ff->sync_master == w);
-    ff->sync_master->last_full_frame = NULL;
+    ff->sync_master->l->last_full_frame = NULL;
     ff->sync_master = NULL;
     // w->l->last_full_frame = NULL;
 }
@@ -924,8 +924,6 @@ check_frame_for_designated_socket(__cilkrts_worker *w, full_frame *ff) {
                 ff->fiber_self = fiber;
                 cilk_fiber_reset_state(fiber, fiber_proc_to_resume_user_code_for_random_steal);
                 //JD XXX wrong way to set team, can cause race
-                w_to_push->l->team = w->l->team;
-                w->l->team = NULL;
             }
             worker_unlock_other(w, w_to_push);
             return w_to_push;
@@ -951,7 +949,6 @@ static void check_frame_for_sync_master(__cilkrts_worker *w, full_frame *ff) {
         // work.
 
         __cilkrts_worker *sync_master = ff->sync_master;
-        CILK_ASSERT(ff->sync_master == w->l->team);
         unset_sync_master(sync_master, ff);
         if(sync_master != w) {
             while(worker_trylock_other(w, sync_master)==0) 
@@ -983,8 +980,6 @@ static void detach_for_steal(__cilkrts_worker *w,
     full_frame *parent_ff, *child_ff, *loot_ff;
     __cilkrts_stack_frame *volatile *h;
     __cilkrts_stack_frame *sf;
-
-    w->l->team = victim->l->team;
 
     CILK_ASSERT(w->l->frame_ff == 0 || w == victim);
 
@@ -1096,7 +1091,7 @@ static void random_steal(__cilkrts_worker *w)
     if (__builtin_expect(w->g->stealing_disabled, 0))
         return;
 
-    CILK_ASSERT(w->l->type == WORKER_SYSTEM || w->l->team == w);
+    CILK_ASSERT(w->l->type == WORKER_SYSTEM);
 
     /* If there is only one processor work can still be stolen.
        There must be only one worker to prevent stealing. */
@@ -1199,7 +1194,7 @@ static void random_steal(__cilkrts_worker *w)
 
     /* Attempt to steal work from the victim */
     if (worker_trylock_other(w, victim)) {
-        if (w->l->type == WORKER_USER && victim->l->team != w) {
+        if (w->l->type == WORKER_USER) {
 
             // Fail to steal if this is a user worker and the victim is not
             // on this team.  If a user worker were allowed to steal work
@@ -1997,14 +1992,6 @@ static full_frame* check_for_work(__cilkrts_worker *w)
     // If there is no work on the queue, try to steal some.
     if (NULL == ff) {
         START_INTERVAL(w, INTERVAL_STEALING) {
-            if (w->l->type != WORKER_USER && w->l->team != NULL) {
-                // At this point, the worker knows for certain that it has run
-                // out of work.  Therefore, it loses its team affiliation.  User
-                // workers never change teams, of course.
-                __cilkrts_worker_lock(w);
-                w->l->team = NULL;
-                __cilkrts_worker_unlock(w);
-            }
 
             // If we are about to do a random steal, we should have no
             // full frame...
@@ -2140,7 +2127,7 @@ static cilk_fiber* worker_scheduling_loop_body(cilk_fiber* current_fiber,
 
     // Stage 2.  First do a quick check of our 1-element queue.
     full_frame *ff = pop_next_frame(w);
-    CILK_ASSERT(ff == NULL || w->l->team != NULL);
+    CILK_ASSERT(ff == NULL);
 
     if (!ff) {
         // Stage 3.  We didn't find anything from our 1-element
@@ -2149,8 +2136,6 @@ static cilk_fiber* worker_scheduling_loop_body(cilk_fiber* current_fiber,
         if (!ff) {
             CILK_ASSERT(w->g->work_done);
             return NULL;
-        } else {
-            CILK_ASSERT(w->l->team != NULL);
         }
     }
 
@@ -3119,7 +3104,6 @@ __cilkrts_worker *make_worker(global_state_t *g,
     w->reserved = NULL;
 
     w->l->worker_magic_0 = WORKER_MAGIC_0;
-    w->l->team = NULL;
     w->l->type = WORKER_FREE;
 
     __cilkrts_mutex_init(&w->l->lock);
