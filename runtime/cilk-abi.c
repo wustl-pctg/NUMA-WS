@@ -411,7 +411,6 @@ static __cilkrts_worker *find_free_worker(global_state_t *g)
         CILK_ASSERT(WORKER_SYSTEM != w->l->type);
         if (w->l->type == WORKER_FREE) {
             w->l->type = WORKER_USER;
-            w->l->team = w;
             return w;
         }
     }
@@ -422,7 +421,6 @@ static __cilkrts_worker *find_free_worker(global_state_t *g)
     __cilkrts_cilkscreen_ignore_block(w, w+1);
     make_worker(g, -1, w);
     w->l->type = WORKER_USER;
-    w->l->team = w;
     return w;
 }
 

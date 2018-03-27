@@ -234,27 +234,7 @@ struct local_state  /* COMMON_PORTABLE */
      */
     struct full_frame *last_full_frame;
 
-    /**
-     * Team on which this worker is a participant.  When a user worker enters,
-     * its team is its own worker struct and it can never change teams.  When a
-     * system worker steals, it adopts the team of its victim.
-     *
-     * When a system worker w steals, it reads victim->l->team and
-     * joins this team.  w->l->team is constant until the next time w
-     * returns control to the runtime.
-     * We must acquire the worker lock to change w->l->team.
-     *
-     * @note This field is 64-byte aligned because it is the first in
-     * the group of shared read-only fields.  We want this group to
-     * fall on a different cache line from the previous group, which
-     * is shared read-write.
-     *
-     * [shared read-only]
-     */
-    __attribute__((aligned(64)))
-    __cilkrts_worker *team;
-
-    /**
+     /**
      * Type of this worker
      *
      * This field changes only when a worker binds or unbinds.

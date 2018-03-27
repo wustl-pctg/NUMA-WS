@@ -65,6 +65,8 @@
 #include "pedigrees.h"
 #include "record-replay.h"
 
+#include <sched.h>
+
 #include <limits.h>
 #include <string.h> /* memcpy */
 #include <stdio.h>  // sprintf
@@ -854,7 +856,7 @@ static __cilkrts_worker *pick_random_worker_on_socket(__cilkrts_worker *w,
     /* determine the range of acceptable worker ID in range [lower, upper) */
     // XXX ANGE: should fix code on workers_per_socket to use what Justin has
     // Can macro define worker_id_to_socket and workers_per_socket to use shift
-    int32_t workers_per_socket = (w->g->P >> 2 == 0) ? 1 : (w->g->P >> 2);
+    int32_t workers_per_socket = w->g->workers_per_socket;
     int32_t lower_id = socket_id * workers_per_socket; // inclusive
     int32_t upper_id = (socket_id + 1) * workers_per_socket; // exclusive
 
@@ -892,13 +894,6 @@ check_frame_for_designated_socket(__cilkrts_worker *w, full_frame *ff) {
     ASSERT_WORKER_LOCK_OWNED(w);
     CILK_ASSERT(ff && w->l->next_frame_ff == ff);
     
-    /*
-    if(ff == NULL) {
-        printf("Pusing a NULL frame!");
-    } else {
-        printf("Pushing frame: %p\n", ff);
-    }*/
-
     __cilkrts_stack_frame *sf = w->l->next_frame_ff->call_stack;
 
     /* Should be ok reading fields of sf without holding frame lock, because these
@@ -923,8 +918,9 @@ check_frame_for_designated_socket(__cilkrts_worker *w, full_frame *ff) {
                 ff->fiber_self = fiber;
                 cilk_fiber_reset_state(fiber, fiber_proc_to_resume_user_code_for_random_steal);
             }
+            printf("pushing work from socket %d to socket %d\n", w->l->my_socket_id, w_to_push->l->my_socket_id);
             worker_unlock_other(w, w_to_push);
-            return w_to_push;
+            return w_to_push; 
         }
     }
 
@@ -1096,7 +1092,7 @@ static void random_steal(__cilkrts_worker *w)
     /**
      * IMPORTANT: Victim number is not the same as the core number!
      */
-    int disable_nonlocal_steal = w->g->disable_nonlocal_steal;
+    // int disable_nonlocal_steal = w->g->disable_nonlocal_steal;
 
 #ifdef BIN_METHOD
     // ANGE XXX: but right now neighbor_percent is not divisible by 2, so we lose sth
@@ -1109,14 +1105,14 @@ static void random_steal(__cilkrts_worker *w)
     int socket_offset = 0;
 
     //fall through the if block to find the right socket to steal from
-    if (locality_rand < w->g->local_percent || disable_nonlocal_steal) {
+    if (locality_rand < w->g->local_percent || w->g->disable_nonlocal_steal) {
         if(w->g->workers_per_socket > 1) {
             socket_offset = myrand(w) % (w->g->workers_per_socket - 1);
         } else { // only one worker per socket; fail in this case 
             return; 
         }
         n = w->l->local_min_worker + socket_offset;
-        if (n >= w->self) { ++n; }
+        if (n == w->self) { ++n; }
     } else {
         // ANGE XXX: don't do the -1 in this case
         if(w->g->workers_per_socket > 1) {
@@ -1142,7 +1138,7 @@ static void random_steal(__cilkrts_worker *w)
     n = steal_rand % (w->g->P - 1);
     if (n >= w->self) { ++n; }
 
-    if(locality_rand != 0 || disable_nonlocal_steal) { // if try locality aware steal, update n
+    if(locality_rand != 0 || w->g->disable_nonlocal_steal) { // if try locality aware steal, update n
         locality_flag = 1;
         int socket_offset = 0;
 
@@ -1150,7 +1146,7 @@ static void random_steal(__cilkrts_worker *w)
          * This starts over at p/4 on ANY success.
          */
         if(w->l->locality_steal_attempt < (w->g->P/4) // less than p/4 steal attempts
-           || disable_nonlocal_steal) { // or nonlocal steal disabled
+           || w->g->disable_nonlocal_steal) { // or nonlocal steal disabled
             /* pick random *other* victim */
             socket_offset = steal_rand % (w->g->workers_per_socket-1); //mod # of cores per socket
             n = w->l->local_min_worker + socket_offset;
@@ -1214,7 +1210,14 @@ static void random_steal(__cilkrts_worker *w)
 
                 // If we're replaying a log, verify that this the correct frame
                 // to steal from the victim
-                if (! replay_match_victim_pedigree(w, victim)) {
+                if ((w->g->disable_nonlocal_steal && 
+                     w->l->my_socket_id != victim->l->my_socket_id) ||
+                    !replay_match_victim_pedigree(w, victim)) {
+                    // the flag disable_nonlocal_steal would have flipped 
+                    // between the last time we read and succeeding dekker
+                    // if that's the case, we give up this steal
+                    // Note that this can only happen during the first randome steal 
+                    // after it flips
                     // Abort the steal attempt. decrement_E(victim) to counter
                     // the increment_E(victim) done by the dekker protocol
                     decrement_E(victim);
@@ -1222,6 +1225,9 @@ static void random_steal(__cilkrts_worker *w)
                 }
 
                 if (proceed_with_steal) {
+                    CILK_ASSERT(!w->g->disable_nonlocal_steal || victim->l->my_socket_id == w->l->my_socket_id);
+
+                    // printf("theif: %d %d, vicitm %d %d, non_local:%d\n", w->self, w->l->my_socket_id, victim->self, victim->l->my_socket_id, w->g->disable_nonlocal_steal);
                     START_INTERVAL(w, INTERVAL_STEAL_SUCCESS) {
                         success = 1;
                         detach_for_steal(w, victim, fiber);
@@ -2035,7 +2041,9 @@ static full_frame* search_until_work_found_or_done(__cilkrts_worker *w)
             CILK_ASSERT(WORKER_SYSTEM == w->l->type);
             // If we are about to wait, then we better not have
             // a frame that we should execute...
-            CILK_ASSERT(NULL == w->l->next_frame_ff);
+            CILK_ASSERT(NULL == w->l->next_frame_ff || 
+                (w->l->next_frame_ff->call_stack->flags & CILK_FRAME_WITH_DESIGNATED_SOCKET &&
+                 w->l->next_frame_ff->call_stack->size == w->l->my_socket_id));
             notify_children_wait(w);
             signal_node_wait(w->l->signal_node);
             // ...
@@ -2109,6 +2117,7 @@ static cilk_fiber* worker_scheduling_loop_body(cilk_fiber* current_fiber,
 {
     __cilkrts_worker *w = (__cilkrts_worker*) wptr;
     CILK_ASSERT(current_fiber == w->l->scheduling_fiber);
+    CILK_ASSERT(w->self == sched_getcpu());
 
     // Stage 1: Transition from executing user code to the runtime code.
     // We don't need to do this call here any more, because
@@ -3174,6 +3183,7 @@ __cilkrts_worker *make_worker(global_state_t *g,
         w->l->remote_neighbor_min_worker -= w->g->P;
     }
 #endif
+    printf("self: %d, socket ID:%d\n", w->self, w->l->my_socket_id);
     /*w->parallelism_disabled = 0;*/
 
     // Allow stealing all frames. Sets w->saved_protected_tail
