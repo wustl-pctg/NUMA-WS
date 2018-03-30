@@ -918,7 +918,6 @@ check_frame_for_designated_socket(__cilkrts_worker *w, full_frame *ff) {
                 ff->fiber_self = fiber;
                 cilk_fiber_reset_state(fiber, fiber_proc_to_resume_user_code_for_random_steal);
             }
-            printf("pushing work from socket %d to socket %d\n", w->l->my_socket_id, w_to_push->l->my_socket_id);
             worker_unlock_other(w, w_to_push);
             return w_to_push; 
         }
@@ -3183,7 +3182,6 @@ __cilkrts_worker *make_worker(global_state_t *g,
         w->l->remote_neighbor_min_worker -= w->g->P;
     }
 #endif
-    printf("self: %d, socket ID:%d\n", w->self, w->l->my_socket_id);
     /*w->parallelism_disabled = 0;*/
 
     // Allow stealing all frames. Sets w->saved_protected_tail
