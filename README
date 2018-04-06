@@ -23,6 +23,22 @@ Within the src/ dir, configure the runtime as follows:
 % make  
 % make install
 
+Locality Paramaters added to this runtime
+=========================================
+CILK_NUM_SOCKETS is the number of sockets the computation will run on.
+CILK_WORKERS_PER_SOCKET is the number of workers on each socket.
+CILK_LOCAL_PERCENT is the percent chance that the steal will be on the local socket.
+CILK_NEIGHBOR_PERCENT is the percent chance that the steal will be on an immediate neighbor.
+CILK_REMOTE_PERCENT is the percent chance that the steal will be on the remote socket.
+
+ex: CILK_NUM_SOCKETS=1 CILK_WORKERS_PER_SOCKET=8 CILK_NWORKERS=8 ./foo
+
+Augmented runtime functions for locality
+========================================
+__cilkrts_set_pinning_info(int) sets the continuation with a socket to be pushed to.
+__cilkrts_unset_pinning_info() unsets all pinning info for the continuation.
+__cilkrts_disable_nonlocal_steal() only allows for steals from the local socket.
+__cilkrts_enable_nonlocal_steal() allows for steals from outside the local socket.
 
 Support for using __cilkrts_detach implemeneted in the runtime
 ==============================================================

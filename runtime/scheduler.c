@@ -902,6 +902,7 @@ check_frame_for_designated_socket(__cilkrts_worker *w, full_frame *ff) {
      */
     if(sf->flags & CILK_FRAME_WITH_DESIGNATED_SOCKET) {
         int socket_id = sf->size;
+        printf("Socket ID: %d\n", socket_id);
         CILK_ASSERT(socket_id >= 0 && socket_id < 4);
         if(w->l->my_socket_id != socket_id) {
             __cilkrts_worker *w_to_push = 
@@ -1224,9 +1225,9 @@ static void random_steal(__cilkrts_worker *w)
                 }
 
                 if (proceed_with_steal) {
-                    CILK_ASSERT(!w->g->disable_nonlocal_steal || victim->l->my_socket_id == w->l->my_socket_id);
+                    CILK_ASSERT(!w->g->disable_nonlocal_steal || 
+                            victim->l->my_socket_id == w->l->my_socket_id);
 
-                    // printf("theif: %d %d, vicitm %d %d, non_local:%d\n", w->self, w->l->my_socket_id, victim->self, victim->l->my_socket_id, w->g->disable_nonlocal_steal);
                     START_INTERVAL(w, INTERVAL_STEAL_SUCCESS) {
                         success = 1;
                         detach_for_steal(w, victim, fiber);

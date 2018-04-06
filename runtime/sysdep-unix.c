@@ -312,9 +312,7 @@ void __cilkrts_start_workers(global_state_t *g, int n)
         CPU_ZERO(&mask);
         CPU_SET(j + cpu_offset, &mask);
         int ret_val = pthread_setaffinity_np(g->sysdep->threads[j], sizeof(mask), &mask);
-        if (ret_val != 0) {
-            printf("ERROR: Could not set CPU affinity");
-        }
+        CILK_ASSERT(ret_val == 0); 
    }  
 
     // write the version information to a file if the environment is configured
