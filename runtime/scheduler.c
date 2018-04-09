@@ -902,7 +902,6 @@ check_frame_for_designated_socket(__cilkrts_worker *w, full_frame *ff) {
      */
     if(sf->flags & CILK_FRAME_WITH_DESIGNATED_SOCKET) {
         int socket_id = sf->size;
-        printf("Socket ID: %d\n", socket_id);
         CILK_ASSERT(socket_id >= 0 && socket_id < 4);
         if(w->l->my_socket_id != socket_id) {
             __cilkrts_worker *w_to_push = 
