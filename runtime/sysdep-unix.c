@@ -195,6 +195,7 @@ NON_COMMON void* scheduler_thread_proc_for_system_worker(void *arg)
     START_INTERVAL(w, INTERVAL_IN_SCHEDULER);
     START_INTERVAL(w, INTERVAL_IN_RUNTIME);
     START_INTERVAL(w, INTERVAL_INIT_WORKER);
+    START_TIMING(w, INTERVAL_SCHED);
 
     // Create a cilk fiber for this worker on this thread.
     START_INTERVAL(w, INTERVAL_FIBER_ALLOCATE_FROM_THREAD) {
@@ -218,6 +219,7 @@ NON_COMMON void* scheduler_thread_proc_for_system_worker(void *arg)
         w->l->scheduling_fiber = NULL;
     } STOP_INTERVAL(w, INTERVAL_FIBER_DEALLOCATE_FROM_THREAD);
 
+    STOP_TIMING(w, INTERVAL_SCHED);
     STOP_INTERVAL(w, INTERVAL_IN_RUNTIME);
     STOP_INTERVAL(w, INTERVAL_IN_SCHEDULER);
     return 0;
