@@ -1990,6 +1990,7 @@ static full_frame* check_for_work(__cilkrts_worker *w)
 {
     full_frame *ff = NULL;
     ff = pop_next_frame(w);
+    STOP_TIMING(w, INTERVAL_SCHED);
     // If there is no work on the queue, try to steal some.
     if (NULL == ff) {
         START_INTERVAL(w, INTERVAL_STEALING) {
@@ -1997,6 +1998,8 @@ static full_frame* check_for_work(__cilkrts_worker *w)
             // If we are about to do a random steal, we should have no
             // full frame...
             CILK_ASSERT(NULL == w->l->frame_ff);
+            START_TIMING(w, INTERVAL_IDLE);
+            START_TIMING(w, INTERVAL_SCHED); 
             random_steal(w);
         } STOP_INTERVAL(w, INTERVAL_STEALING);
 
@@ -2004,16 +2007,24 @@ static full_frame* check_for_work(__cilkrts_worker *w)
         // frame with the work to resume.
         ff = pop_next_frame(w);
         if (NULL == ff) {
+
+            STOP_TIMING(w, INTERVAL_IDLE);
+            DROP_TIMING(w, INTERVAL_SCHED);
             // Punish the worker for failing to steal.
             // No quantum for you!
+            START_TIMING(w, INTERVAL_IDLE);
             __cilkrts_yield();
             w->l->steal_failure_count++;
+            STOP_TIMING(w, INTERVAL_IDLE);
         } else {
+            DROP_TIMING(w, INTERVAL_IDLE);
+            STOP_TIMING(w, INTERVAL_SCHED);
             // Reset steal_failure_count since there is obviously still work to
             // be done.
             w->l->steal_failure_count = 0;
         }
     }
+    START_TIMING(w, INTERVAL_SCHED);
     return ff;
 }
 
@@ -2303,8 +2314,10 @@ static void worker_scheduler_function(__cilkrts_worker *w)
 
             // Whenever we jump to resume user code, we stop being in
             // the runtime, and start working.
+            STOP_TIMING(w, INTERVAL_SCHED);
             STOP_INTERVAL(w, INTERVAL_IN_RUNTIME);
             START_INTERVAL(w, INTERVAL_WORKING);
+            START_TIMING(w, INTERVAL_WORK_INFLATION);
             cilk_fiber_suspend_self_and_resume_other(w->l->scheduling_fiber,
                                                      fiber_to_resume);
             // Return here only when this (scheduling) fiber is
@@ -2500,9 +2513,11 @@ static void do_sync(__cilkrts_worker *w, full_frame *ff,
 NORETURN __cilkrts_c_sync(__cilkrts_worker *w,
                           __cilkrts_stack_frame *sf_at_sync)
 {
-    full_frame *ff; 
+    full_frame *ff;
+    STOP_TIMING(w, INTERVAL_WORK_INFLATION); 
     STOP_INTERVAL(w, INTERVAL_WORKING);
     START_INTERVAL(w, INTERVAL_IN_RUNTIME);
+    START_TIMING(w, INTERVAL_SCHED);
 
     // Claim: This read of w->l->frame_ff can occur without
     // holding the worker lock because when w has reached a sync
@@ -2589,8 +2604,10 @@ void __cilkrts_c_THE_exception_check(__cilkrts_worker *w,
 
     // For the exception check, stop working and count as time in
     // runtime.
+    STOP_TIMING(w, INTERVAL_WORK_INFLATION);
     STOP_INTERVAL(w, INTERVAL_WORKING);
     START_INTERVAL(w, INTERVAL_IN_RUNTIME);
+    START_TIMING(w, INTERVAL_SCHED);
 
     START_INTERVAL(w, INTERVAL_THE_EXCEPTION_CHECK);
 
@@ -2662,8 +2679,10 @@ void __cilkrts_c_THE_exception_check(__cilkrts_worker *w,
 
         // If we fail the exception check and return, then switch back
         // to working.
+        STOP_TIMING(w, INTERVAL_SCHED);
         STOP_INTERVAL(w, INTERVAL_IN_RUNTIME);
         START_INTERVAL(w, INTERVAL_WORKING);
+        START_TIMING(w, INTERVAL_WORK_INFLATION);
         return;
     }
 }
@@ -2673,6 +2692,7 @@ NORETURN __cilkrts_exception_from_spawn(__cilkrts_worker *w,
                                         __cilkrts_stack_frame *returning_sf)
 {
     full_frame *ff = w->l->frame_ff;
+    STOP_TIMING(w, INTERVAL_WORK_INFLATION);
     STOP_INTERVAL(w, INTERVAL_WORKING);
     START_INTERVAL(w, INTERVAL_IN_RUNTIME);
 
@@ -2823,9 +2843,11 @@ void __cilkrts_return(__cilkrts_worker *w)
     full_frame *ff, *parent_ff;
 
     // Count time during the return as in the runtime.
+    STOP_TIMING(w, INTERVAL_WORK_INFLATION);
     STOP_INTERVAL(w, INTERVAL_WORKING);
     START_INTERVAL(w, INTERVAL_IN_RUNTIME);
     START_INTERVAL(w, INTERVAL_RETURNING);
+    START_TIMING(w, INTERVAL_SCHED):
 
     BEGIN_WITH_WORKER_LOCK_OPTIONAL(w) {
         ff = w->l->frame_ff;
@@ -2877,9 +2899,11 @@ void __cilkrts_return(__cilkrts_worker *w)
         }
     } END_WITH_WORKER_LOCK_OPTIONAL(w);
 
+    STOP_TIMING(w, INTERVAL_SCHED);
     STOP_INTERVAL(w, INTERVAL_RETURNING);
     STOP_INTERVAL(w, INTERVAL_IN_RUNTIME);
     START_INTERVAL(w, INTERVAL_WORKING);
+    START_TIMING(w, INTERVAL_WORK_INFLATION);
 }
 
 static void __cilkrts_unbind_thread()
@@ -2895,8 +2919,12 @@ static void __cilkrts_unbind_thread()
         if (w) {
             g = w->g;
 
+#ifdef SCHED_STATS
+            __cilkrts_accum_timings(w);
+#endif
 
             // Matches the START in bind_thread in cilk-abi.c.
+            START_TIMING(w, INTERVAL_SCHED);
             STOP_INTERVAL(w, INTERVAL_IN_RUNTIME);
             STOP_INTERVAL(w, INTERVAL_IN_SCHEDULER);
 
@@ -2933,8 +2961,10 @@ void __cilkrts_c_return_from_initial(__cilkrts_worker *w)
 
     // When we are returning from the initial frame, switch from
     // INTERVAL_WORKING into INTERVAL_IN_RUNTIME.
+    STOP_TIMING(w, INTERVAL_WORK_INFLATION);
     STOP_INTERVAL(w, INTERVAL_WORKING);
     START_INTERVAL(w, INTERVAL_IN_RUNTIME);
+    START_TIMING(w, INTERVAL_SCHED);
 
     /* This is only called on a user thread worker. */
     CILK_ASSERT(w->l->type == WORKER_USER);
@@ -3148,6 +3178,14 @@ __cilkrts_worker *make_worker(global_state_t *g,
 #else
     w->l->stats = NULL;
 #endif
+
+#ifdef SCHED_STATS
+    w->l->sched_stats = __cilkrts_malloc(sizeof(stats));
+    __cilkrts_init_sched_stats(w->l->sched_stats);
+#else
+    w->l->sched_stats = NULL;
+#endif
+
     w->l->steal_failure_count = 0;
 
     w->l->work_stolen = 0;
@@ -3931,8 +3969,10 @@ slow_path_reductions_for_spawn_return(__cilkrts_worker *w,
 
             // After we've released the lock, start counting time as
             // WORKING again.
+            STOP_TIMING(w, INTERVAL_SCHED);
             STOP_INTERVAL(w, INTERVAL_IN_RUNTIME);
             START_INTERVAL(w, INTERVAL_WORKING);
+            STOP_TIMING(w, INTERVAL_WORK_INFLATION);
 
             // Merge all reducers into the left map.
             left_map = repeated_merge_reducer_maps(&w,
@@ -3954,8 +3994,10 @@ slow_path_reductions_for_spawn_return(__cilkrts_worker *w,
             ff->pending_exception = w->l->pending_exception;
             w->l->pending_exception = NULL;
 
+            STOP_TIMING(w, INTERVAL_WORK_INFLATION);
             STOP_INTERVAL(w, INTERVAL_WORKING);
             START_INTERVAL(w, INTERVAL_IN_RUNTIME);
+            START_TIMING(w, INTERVAL_SCHED);
 
             // Lock ff->parent for the next loop around.
             __cilkrts_frame_lock(w, ff->parent);
@@ -4120,8 +4162,10 @@ slow_path_reductions_for_sync(__cilkrts_worker *w,
 
         // After we've released the lock, start counting time as
         // WORKING again.
+        STOP_TIMING(w, INTERVAL_SCHED);
         STOP_INTERVAL(w, INTERVAL_IN_RUNTIME);
         START_INTERVAL(w, INTERVAL_WORKING);
+        START_TIMING(w, INTERVAL_WORK_INFLATION);
 
         // If we get here, we have a nontrivial reduction to execute.
         middle_map = repeated_merge_reducer_maps(&w,
@@ -4129,8 +4173,10 @@ slow_path_reductions_for_sync(__cilkrts_worker *w,
                                                  middle_map);
         verify_current_wkr(w);
 
+        STOP_TIMING(w, INTERVAL_WORK_INFLATION);
         STOP_INTERVAL(w, INTERVAL_WORKING);
         START_INTERVAL(w, INTERVAL_IN_RUNTIME);
+        START_TIMING(w, INTERVAL_SCHED);
 
         // Save any exceptions generated because of the reduction
         // process.  These get merged the next time around the
