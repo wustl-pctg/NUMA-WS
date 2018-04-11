@@ -349,6 +349,8 @@ struct local_state  /* COMMON_PORTABLE */
      */
     statistics* stats;
 
+    struct sched_stats* sched_stats;
+
     /**
      * Count indicates number of failures since last successful steal.  This is
      * used by the scheduler to reduce contention on shared flags.

@@ -126,6 +126,7 @@ set(cilkrts_srcs
     runtime/scheduler.c
     runtime/signal_node.c
     runtime/spin_mutex.c
+    runtime/sched_stats.cpp
     runtime/stats.c
     runtime/worker_mutex.c
 )

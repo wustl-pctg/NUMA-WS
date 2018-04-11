@@ -106,6 +106,7 @@ libcilkrts_la_SOURCES =            \
   runtime/signal_node.c            \
   runtime/spin_mutex.c             \
   runtime/stats.c                  \
+  runtime/sched_stats.cpp          \
   runtime/sysdep-unix.c            \
   runtime/worker_mutex.c
 

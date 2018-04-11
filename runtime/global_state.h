@@ -63,6 +63,7 @@
 #include "stats.h"
 #include "bug.h"
 #include "cilk_fiber.h"
+#include "sched_stats.h"
 
 __CILKRTS_BEGIN_EXTERN_C
 
@@ -197,6 +198,8 @@ struct global_state_t { /* COMMON_PORTABLE */
 
     statistics stats;    ///< Statistics on use of runtime
 
+    struct total_stats *sched_stats;
+    
     /**
      * @brief USER SETTING: Maximum number of stacks the runtime will
      * allocate (apart from those created by the OS when worker

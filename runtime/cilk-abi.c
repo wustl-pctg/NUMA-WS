@@ -110,6 +110,27 @@ void * _ReturnAddress(void);
  */
 #define BIND_THREAD_RTN __cilkrts_bind_thread_1
 
+#define cycleToSecond(cycle) cycle/2200000000
+
+/**
+ * A single "check" to find work, either on our queue or through a
+ * steal attempt.  This method checks our local queue once, and
+ * performs one steal attempt.
+ */
+#ifdef SCHED_STATS
+#define calcCycle(high,low) (((uint64_t)high<<32) | low)
+uint64_t bCycleCount(){
+        unsigned cycles_low0, cycles_high0;
+        __asm__  volatile("cpuid\n\t"
+                  "rdtsc\n\t"
+                  "mov %%edx, %0\n\t"
+                  "mov %%eax, %1\n\t"
+                  : "=r" (cycles_high0), "=r" (cycles_low0)
+                  :: "%rax", "%rbx", "%rcx", "%rdx");
+        return calcCycle(cycles_high0, cycles_low0);
+}
+#endif
+
 static inline
 void enter_frame_internal(__cilkrts_stack_frame *sf, uint32_t version)
 {
@@ -556,7 +577,11 @@ CILK_ABI_WORKER_PTR BIND_THREAD_RTN(void)
     STOP_TIMING(w, INTERVAL_SCHED);
     STOP_INTERVAL(w, INTERVAL_IN_RUNTIME);
     START_INTERVAL(w, INTERVAL_WORKING);
-
+#ifdef SCHED_STATS
+    //CILK_ASSERT(w->l->begin == 0);
+    //w->l->end = 0;
+    //w->l->begin = bCycleCount(); 
+#endif
     START_TIMING(w, INTERVAL_WORK_INFLATION);
     ITT_SYNC_RELEASING(&unique_obj);
 

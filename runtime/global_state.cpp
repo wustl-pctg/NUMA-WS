@@ -642,6 +642,10 @@ global_state_t* cilkg_init_global_state()
 
     __cilkrts_init_stats(&g->stats);
 
+#ifdef SCHED_STATS
+    g->sched_stats = (struct total_stats *) __cilkrts_malloc(sizeof(struct total_stats));
+    __cilkrts_init_total_stats(g->sched_stats);
+#endif
     __cilkrts_frame_malloc_global_init(g);
 
     g->Q = 0;

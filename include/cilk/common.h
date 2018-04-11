@@ -80,6 +80,11 @@ namespace cilk {
 #define BIN_METHOD
 #define CORES_PER_SOCKET 8 
 
+/*timing stuff*/
+#define WORK_INFLATION
+#define SCHEDULING_TIME
+#define IDLE_TIME
+
 #ifdef __cplusplus
 #   include <cassert>
 #else

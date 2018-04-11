@@ -2695,6 +2695,7 @@ NORETURN __cilkrts_exception_from_spawn(__cilkrts_worker *w,
     STOP_TIMING(w, INTERVAL_WORK_INFLATION);
     STOP_INTERVAL(w, INTERVAL_WORKING);
     START_INTERVAL(w, INTERVAL_IN_RUNTIME);
+    START_TIMING(w, INTERVAL_SCHED);
 
     // This is almost the same as THE_exception_check, except
     // the detach didn't happen, we don't need to undo the tail
@@ -2847,7 +2848,7 @@ void __cilkrts_return(__cilkrts_worker *w)
     STOP_INTERVAL(w, INTERVAL_WORKING);
     START_INTERVAL(w, INTERVAL_IN_RUNTIME);
     START_INTERVAL(w, INTERVAL_RETURNING);
-    START_TIMING(w, INTERVAL_SCHED):
+    START_TIMING(w, INTERVAL_SCHED);
 
     BEGIN_WITH_WORKER_LOCK_OPTIONAL(w) {
         ff = w->l->frame_ff;
@@ -2924,7 +2925,7 @@ static void __cilkrts_unbind_thread()
 #endif
 
             // Matches the START in bind_thread in cilk-abi.c.
-            START_TIMING(w, INTERVAL_SCHED);
+            STOP_TIMING(w, INTERVAL_SCHED);
             STOP_INTERVAL(w, INTERVAL_IN_RUNTIME);
             STOP_INTERVAL(w, INTERVAL_IN_SCHEDULER);
 
