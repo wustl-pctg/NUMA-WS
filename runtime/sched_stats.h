@@ -2,12 +2,8 @@
 #include "rts-common.h"
 #include "internal/abi.h"
 
-#define SCHED_STATS 1 
-
 #ifdef SCHED_STATS
 #define NUMBER_OF_STATS 3
-
-__CILKRTS_BEGIN_EXTERN_C
 
 enum timing
 {
@@ -63,4 +59,3 @@ void __cilkrts_stop_timing(__cilkrts_worker *w, enum timing i);
 # define DROP_TIMING(w, i)
 
 #endif
-__CILKRTS_END_EXTERN_C

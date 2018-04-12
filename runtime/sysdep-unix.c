@@ -61,7 +61,6 @@
 #include "reducer_impl.h"
 #include "metacall_impl.h"
 
-
 // On x86 processors (but not MIC processors), the compiler generated code to
 // save the FP state (rounding mode and the like) before calling setjmp.  We
 // will need to restore that state when we resume.
@@ -176,6 +175,8 @@ NON_COMMON void* scheduler_thread_proc_for_system_worker(void *arg)
     /*int status;*/
     __cilkrts_worker *w = (__cilkrts_worker *)arg;
 
+    LIKWID_MARKER_THREADINIT;
+
 #ifdef __INTEL_COMPILER
 #ifdef USE_ITTNOTIFY
     // Name the threads for Advisor.  They don't want a worker number.
@@ -195,6 +196,7 @@ NON_COMMON void* scheduler_thread_proc_for_system_worker(void *arg)
     START_INTERVAL(w, INTERVAL_IN_SCHEDULER);
     START_INTERVAL(w, INTERVAL_IN_RUNTIME);
     START_INTERVAL(w, INTERVAL_INIT_WORKER);
+    LIKWID_MARKER_START("Runtime");
     START_TIMING(w, INTERVAL_SCHED);
 
     // Create a cilk fiber for this worker on this thread.
@@ -220,6 +222,7 @@ NON_COMMON void* scheduler_thread_proc_for_system_worker(void *arg)
     } STOP_INTERVAL(w, INTERVAL_FIBER_DEALLOCATE_FROM_THREAD);
 
     STOP_TIMING(w, INTERVAL_SCHED);
+    LIKWID_MARKER_STOP("Runtime");
     STOP_INTERVAL(w, INTERVAL_IN_RUNTIME);
     STOP_INTERVAL(w, INTERVAL_IN_SCHEDULER);
     return 0;
@@ -287,6 +290,8 @@ void __cilkrts_start_workers(global_state_t *g, int n)
     if (!g->sysdep->threads)
         return;
 
+    LIKWID_MARKER_INIT;
+    LIKWID_MARKER_THREADINIT;
     // Do we actually have any threads to create?
     if (n > 0) {
         // Simply create all the threads linearly here.
