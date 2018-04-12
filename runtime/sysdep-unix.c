@@ -196,7 +196,7 @@ NON_COMMON void* scheduler_thread_proc_for_system_worker(void *arg)
     START_INTERVAL(w, INTERVAL_IN_SCHEDULER);
     START_INTERVAL(w, INTERVAL_IN_RUNTIME);
     START_INTERVAL(w, INTERVAL_INIT_WORKER);
-    LIKWID_MARKER_START("Runtime");
+    //LIKWID_MARKER_START("Runtime");
     START_TIMING(w, INTERVAL_SCHED);
 
     // Create a cilk fiber for this worker on this thread.
@@ -222,7 +222,7 @@ NON_COMMON void* scheduler_thread_proc_for_system_worker(void *arg)
     } STOP_INTERVAL(w, INTERVAL_FIBER_DEALLOCATE_FROM_THREAD);
 
     STOP_TIMING(w, INTERVAL_SCHED);
-    LIKWID_MARKER_STOP("Runtime");
+    //LIKWID_MARKER_STOP("Runtime");
     STOP_INTERVAL(w, INTERVAL_IN_RUNTIME);
     STOP_INTERVAL(w, INTERVAL_IN_SCHEDULER);
     return 0;

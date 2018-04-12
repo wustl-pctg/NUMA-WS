@@ -500,7 +500,7 @@ CILK_ABI_WORKER_PTR BIND_THREAD_RTN(void)
 
     START_INTERVAL(w, INTERVAL_IN_SCHEDULER);
     START_INTERVAL(w, INTERVAL_IN_RUNTIME);
-    LIKWID_MARKER_START("Runtime"); 
+    //LIKWID_MARKER_START("Runtime"); 
     START_TIMING(w, INTERVAL_SCHED);
     {
         full_frame *ff = __cilkrts_make_full_frame(w, 0);
@@ -576,7 +576,7 @@ CILK_ABI_WORKER_PTR BIND_THREAD_RTN(void)
     /* We are about to switch back into user code after binding the
        thread.  Start working again. */
     STOP_TIMING(w, INTERVAL_SCHED);
-    LIKWID_MARKER_STOP("Runtime");
+    //LIKWID_MARKER_STOP("Runtime");
     STOP_INTERVAL(w, INTERVAL_IN_RUNTIME);
     START_INTERVAL(w, INTERVAL_WORKING);
 #ifdef SCHED_STATS
