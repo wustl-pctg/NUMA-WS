@@ -83,6 +83,7 @@ __cilkrts_stack_alloc
 __cilkrts_stack_free
 __cilkrts_sync
 __cilkrts_synched
+__cilkrts_reset_timing
 __cilkrts_watch_stack
 __cilkrts_worker_stub
 update_pedigree_after_sync

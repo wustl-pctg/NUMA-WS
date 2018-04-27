@@ -1,12 +1,16 @@
 #include <cilk/common.h>
+
 #include "rts-common.h"
 #include "internal/abi.h"
 
-#ifdef SCHED_STATS
+#ifndef __SCHED_STATS_HEADER__
+#define __SCHED_STATS_HEADER__
+
 #define NUMBER_OF_STATS 3
 
 __CILKRTS_BEGIN_EXTERN_C
 
+#ifdef SCHED_STATS
 enum timing
 {
     INTERVAL_SCHED, //Scheduler Overhead
@@ -51,12 +55,19 @@ void __cilkrts_drop_timing(__cilkrts_worker *w, enum timing i);
 COMMON_PORTABLE
 void __cilkrts_stop_timing(__cilkrts_worker *w, enum timing i);
 
+COMMON_PORTABLE
+void __cilkrts_reset_timing();
+
 # define START_TIMING(w, i) __cilkrts_start_timing(w, i);
 # define STOP_TIMING(w, i) __cilkrts_stop_timing(w, i);
 # define DROP_TIMING(w, i) __cilkrts_drop_timing(w, i);
-__CILKRTS_END_EXTERN_C
+
 #else
 # define START_TIMING(w, i)
 # define STOP_TIMING(w, i)
 # define DROP_TIMING(w, i)
-#endif
+#endif // SCHED_STATS
+
+__CILKRTS_END_EXTERN_C
+
+#endif // __SCHED_STATS_HEADER__

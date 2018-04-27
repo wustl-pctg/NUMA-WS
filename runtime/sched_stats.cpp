@@ -2,17 +2,17 @@
 #include "bug.h"
 #include "os.h"
 #include "local_state.h"
+#include "sched_stats.h"
 
 #include <stdio.h>
-
 
 #ifdef SCHED_STATS
 
 #define calculateCycle(high,low) (((uint64_t)high<<32) | low)
 
-#define cycleToSecond(cycle) cycle/2200000000
-#define cycleToNanoSecond(cycle) cycle/2200
-#define NanoSecondToSecond(NanoSecond) NanoSecond/1000000
+#define cycleToSecond(cycle) ((double)cycle/(double)2200000000.0)
+#define cycleToMicroSecond(cycle) (cycle/2200)
+#define MicroSecondToSecond(MicroSecond) ((double)MicroSecond/(double)1000000)
 
 uint64_t beginCycleCount(){
         unsigned cycles_low0, cycles_high0;
@@ -59,7 +59,7 @@ void __cilkrts_start_timing(__cilkrts_worker *w, enum timing i)
 {
     if (w) {
         stats *s = w->l->sched_stats;
-        CILK_ASSERT(s->begin[i] == 0); 
+        CILK_ASSERT(s->begin[i] == 0);
         s->end[i] = 0;
         s->begin[i] = beginCycleCount();
     }
@@ -91,16 +91,30 @@ void __cilkrts_accum_timings(__cilkrts_worker *w)
 {
     global_state_t *g = w->g;
 
-    int i, j;
-    for (i = 0; i < NUMBER_OF_STATS; ++i){
-        for (j = 0; j < g->total_workers; ++j){
-            uint64_t increment = cycleToNanoSecond(g->workers[j]->l->sched_stats->time[i]);
+    for(int i = 0; i < NUMBER_OF_STATS; ++i) {
+        for(int j = 0; j < g->total_workers; ++j) {
+            uint64_t increment = 
+                cycleToMicroSecond(g->workers[j]->l->sched_stats->time[i]);
             g->sched_stats->time[i] += (double) increment;
             g->workers[j]->l->sched_stats->time[i] = 0;
         }
     }
-    fprintf(stdout, "Total Scheduling Time: %f\n", NanoSecondToSecond(g->sched_stats->time[INTERVAL_SCHED]));
-    fprintf(stdout, "Total Working Time: %f\n", NanoSecondToSecond(g->sched_stats->time[INTERVAL_WORKING]));
-    fprintf(stdout, "Total Idle Time: %f\n", NanoSecondToSecond(g->sched_stats->time[INTERVAL_IDLE]));
+    fprintf(stdout, "Total Scheduling Time: %f\n", 
+            MicroSecondToSecond(g->sched_stats->time[INTERVAL_SCHED]));
+    fprintf(stdout, "Total Working Time: %f\n", 
+            MicroSecondToSecond(g->sched_stats->time[INTERVAL_WORKING]));
+    fprintf(stdout, "Total Idle Time: %f\n", 
+            MicroSecondToSecond(g->sched_stats->time[INTERVAL_IDLE]));
+}
+
+void __cilkrts_reset_timing() 
+{
+    global_state_t *g = cilkg_get_global_state();
+    for(int i = 0; i < NUMBER_OF_STATS; ++i) {
+        g->sched_stats->time[i] = 0.0;
+    }
+
+    LIKWID_MARKER_CLOSE;
+    LIKWID_MARKER_INIT;
 }
 #endif

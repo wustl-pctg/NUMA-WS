@@ -86,6 +86,7 @@ CILKABI0
     __cilkrts_init_sched_stats;
     __cilkrts_accum_timings;
     __cilkrts_drop_timing;
+    __cilkrts_reset_timing;
     update_pedigree_after_sync;
   local: *;
 };

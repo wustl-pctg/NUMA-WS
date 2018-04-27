@@ -383,6 +383,9 @@ __CILKRTS_BEGIN_EXTERN_C
     /// about using __declspec(nothrow) after the "void *" return type
     typedef void * __cilkrts_void_ptr;
 
+    //reset instrumentation time
+    void __cilkrts_reset_timing(void);
+
 __CILKRTS_END_EXTERN_C
 
 
