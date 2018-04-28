@@ -1102,7 +1102,6 @@ static int choose_victim(__cilkrts_worker *w)
     // ANGE XXX: but right now neighbor_percent is not divisible by 2, so we lose sth
     // ANGE XXX: also, as written, what if the percents don't add up to 100?
     // ANGE XXX: it would skewed towards stealing from local socket 
-    // ANGE XXX: we never used local_percent
     int neighbor_percent_half = w->g->neighbor_percent >> 1;
     int sum = w->g->local_percent + w->g->neighbor_percent + w->g->remote_percent;
     int locality_rand = myrand(w) % sum;
@@ -1118,7 +1117,6 @@ static int choose_victim(__cilkrts_worker *w)
         n = w->l->local_min_worker + socket_offset;
         if (n >= w->self) { ++n; }
     } else {
-        // ANGE XXX: don't do the -1 in this case
         if(w->g->workers_per_socket > 1) {
             socket_offset = myrand(w) % (w->g->workers_per_socket);
         }
@@ -1134,7 +1132,7 @@ static int choose_victim(__cilkrts_worker *w)
 #else // ifndef BIN_METHOD
     int locality_flag = 0;
     // select which type of stealing to do
-    // ANGE XXX: non-locality to locality: 1-to-k ratio, need 0 ... k 
+    // non-locality to locality: 1-to-k ratio, need 0 ... k 
     int locality_rand = myrand(w) % (w->g->locality_ratio + 1);
     unsigned int steal_rand = myrand(w);
 
@@ -1156,7 +1154,6 @@ static int choose_victim(__cilkrts_worker *w)
             n = w->l->local_min_worker + socket_offset;
             if(n >= w->self) { ++n; }
         } else if (w->l->locality_steal_attempt < (w->g->P/2)) { // less than p/2 steal attempts
-            // ANGE XXX: What are we doing here??
             socket_offset = steal_rand % (w->g->workers_per_socket << 1); //mod # of cores per socket
             // randomly pick between higher and lower neighbors
             if(socket_offset < w->g->workers_per_socket) {
@@ -1220,23 +1217,6 @@ static void random_steal(__cilkrts_worker *w)
 
     /* Attempt to steal work from the victim */
     if (worker_trylock_other(w, victim)) {
-        /* ANGE XXX: this is a bug; remove
-        if (w->l->type == WORKER_USER) {
-
-            // Fail to steal if this is a user worker and the victim is not
-            // on this team.  If a user worker were allowed to steal work
-            // descended from another user worker, the former might not be
-            // done with its work by the time it was needed to resume and
-            // unbind.  Therefore, user workers are not permitted to change
-            // teams.
-
-            // There is no race on the victim's team because the victim cannot
-            // change its team until it runs out of work to do, at which point
-            // it will try to take out its own lock, and this worker already
-            // holds it.
-            NOTE_INTERVAL(w, INTERVAL_STEAL_FAIL_USER_WORKER);
-
-        } else */
         if (victim->l->frame_ff) {
             if (victim->l->next_frame_ff) {
                 BEGIN_WITH_WORKER_LOCK(w) {
@@ -3269,7 +3249,6 @@ __cilkrts_worker *make_worker(global_state_t *g,
     // Intitalize locality aware stealing
     w->l->locality_steal_attempt = 0;
 #endif
-    // ANGE XXX: minor update to rid of mod 
     CILK_ASSERT(w->g->workers_per_socket * w->g->num_sockets == w->g->P);
     w->l->my_socket_id = self / w->g->workers_per_socket;
     w->l->local_min_worker = w->l->my_socket_id * w->g->workers_per_socket;
