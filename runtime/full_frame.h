@@ -239,6 +239,12 @@ struct full_frame
     full_frame *rightmost_child;
 
     /**
+     * Pointer to the next frame; allowing the worker's w->l->next_frame
+     * to form a linked list.
+     */
+    full_frame *next;
+  
+    /**
      * Call stack associated with this frame.
      * Set and reset in make_unrunnable and make_runnable
      *

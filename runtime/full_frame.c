@@ -70,6 +70,7 @@ full_frame *__cilkrts_make_full_frame(__cilkrts_worker *w,
         ff->parent = 0;
         ff->rightmost_child = 0;
         ff->left_sibling = ff->right_sibling = 0;
+        ff->next = 0;
         ff->call_stack = sf;
         ff->is_call_child = 0;
         ff->simulated_stolen = 0;

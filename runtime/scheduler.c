@@ -441,19 +441,26 @@ void __cilkrts_push_next_frame(__cilkrts_worker *w, full_frame *ff)
     // Added for locality
     ASSERT_WORKER_LOCK_OWNED(w);
     CILK_ASSERT(ff);
-    CILK_ASSERT(w->l->next_frame_ff == NULL);
+    CILK_ASSERT(ff->next == NULL);
+    // CILK_ASSERT(w->l->next_frame_ff == NULL);
     incjoin(ff);
+    // Last in first out
+    full_frame *curr = w->l->next_frame_ff;
     w->l->next_frame_ff = ff;
+    ff->next = curr;
 }
 
-static void transfer_next_frame(__cilkrts_worker *w, __cilkrts_worker *target) {
-    ASSERT_WORKER_LOCK_OWNED(w);
-    ASSERT_WORKER_LOCK_OWNED(target);
-    CILK_ASSERT(w->l->next_frame_ff->call_stack);
-    CILK_ASSERT(w->l->next_frame_ff);
-    CILK_ASSERT(!target->l->next_frame_ff);
-    target->l->next_frame_ff = w->l->next_frame_ff;
-    w->l->next_frame_ff = NULL;
+static void transfer_next_frame(__cilkrts_worker *from_w, __cilkrts_worker *to_w) {
+    ASSERT_WORKER_LOCK_OWNED(from_w);
+    ASSERT_WORKER_LOCK_OWNED(to_w);
+    CILK_ASSERT(from_w->l->next_frame_ff->call_stack);
+    CILK_ASSERT(from_w->l->next_frame_ff);
+    // CILK_ASSERT(!target->l->next_frame_ff);
+    full_frame *ff_to_transfer = from_w->l->next_frame_ff;
+    from_w->l->next_frame_ff = ff_to_transfer->next;
+    // Last in first out
+    ff_to_transfer->next = to_w->l->next_frame_ff;
+    to_w->l->next_frame_ff = ff_to_transfer;
 }
 
 /* Get the next full-frame to be made active in this worker.  The join count
@@ -463,21 +470,30 @@ static void transfer_next_frame(__cilkrts_worker *w, __cilkrts_worker *target) {
 static full_frame *pop_next_frame(__cilkrts_worker *w)
 {
     full_frame *ff;
+
+    ASSERT_WORKER_LOCK_NOT_OWNED(w);
+    BEGIN_WITH_WORKER_LOCK(w) {
+        ff = w->l->next_frame_ff;
+        if(ff) {
+            w->l->next_frame_ff = ff->next;
+            ff->next = NULL;
+        }
+    } END_WITH_WORKER_LOCK(w);
+
+    return ff;
+}
+
+static full_frame *pop_next_frame_locked(__cilkrts_worker *w)
+{
+    full_frame *ff;
+
+    ASSERT_WORKER_LOCK_OWNED(w);
     ff = w->l->next_frame_ff;
-    // Remove the frame from the next_frame field.
-    //
-    // If this is a user worker, then there is a chance that another worker
-    // from our team could push work into our next_frame (if it is the last
-    // worker doing work for this team).  The other worker's setting of the
-    // next_frame could race with our setting of next_frame to NULL.  This is
-    // the only possible race condition on next_frame.  However, if next_frame
-    // has a non-NULL value, then it means the team still has work to do, and
-    // there is no chance of another team member populating next_frame.  Thus,
-    // it is safe to set next_frame to NULL, if it was populated.  There is no
-    // need for an atomic op.
-    if (NULL != ff) {
-        w->l->next_frame_ff = NULL;
+    if(ff) {
+        w->l->next_frame_ff = ff->next;
+        ff->next = NULL;
     }
+
     return ff;
 }
 
@@ -734,12 +750,16 @@ static full_frame *unroll_call_stack(__cilkrts_worker *w,
     } while (sf);
     sf = rev_sf;
 
+    // At this point, sf should be the oldest sf in the unrolling stacklet
+    int size = sf->size;
+
     /* Promote each stack frame to a full frame in order from parent
        to child, following the reversed list we just built. */
     make_unrunnable(w, ff, sf, sf == loot_sf, "steal 1");
     /* T is the *child* of SF, because we have reversed the list */
     for (t_sf = __cilkrts_advance_frame(sf); t_sf;
          sf = t_sf, t_sf = __cilkrts_advance_frame(sf)) {
+        t_sf->size = size; // set the size, which is the socket it should be on
         ff = make_child(w, ff, t_sf, NULL);
         make_unrunnable(w, ff, t_sf, t_sf == loot_sf, "steal 2");
         CILK_ASSERT(ff->call_stack);
@@ -901,8 +921,8 @@ check_frame_for_designated_socket(__cilkrts_worker *w, full_frame *ff) {
      * resume now that we own loot_ff.
      */
     if(sf->flags & CILK_FRAME_WITH_DESIGNATED_SOCKET) {
-        int socket_id = sf->size;
-        CILK_ASSERT(socket_id >= 0 && socket_id < 4);
+        int socket_id = sf->size % w->g->num_sockets;
+        CILK_ASSERT(socket_id >= 0 && socket_id < w->g->num_sockets);
         if(w->l->my_socket_id != socket_id) {
             __cilkrts_worker *w_to_push = 
                 pick_random_worker_on_socket(w, socket_id);
@@ -1065,29 +1085,14 @@ static void detach_for_steal(__cilkrts_worker *w,
     return;
 }
 
-static void random_steal(__cilkrts_worker *w)
+/* Return the chosen victim ID, or return -1 if failed to choose a victim 
+ * (i.e., in the case of local steal only and there is only self on this socket)
+ **/
+static int choose_victim(__cilkrts_worker *w) 
 {
-    __cilkrts_worker *victim = NULL;
-    // use a place holder for now and create the fiber after we figure out
-    // who actually gets the frame
-    cilk_fiber *fiber = PLACEHOLDER_FIBER; 
 
     int n;
-    int success = 0;
-    int32_t victim_id;
-
-    // Nothing's been stolen yet. When true, this will flag
-    // setup_for_execution_pedigree to increment the pedigree
-    w->l->work_stolen = 0;
-
-    /* If the user has disabled stealing (using the debugger) we fail */
-    if (__builtin_expect(w->g->stealing_disabled, 0))
-        return;
-
-    /* If there is only one processor work can still be stolen.
-       There must be only one worker to prevent stealing. */
-    CILK_ASSERT(w->g->total_workers > 1);
-
+    // ANGE XXX: Is the following comment still true?
     /**
      * IMPORTANT: Victim number is not the same as the core number!
      */
@@ -1108,10 +1113,10 @@ static void random_steal(__cilkrts_worker *w)
         if(w->g->workers_per_socket > 1) {
             socket_offset = myrand(w) % (w->g->workers_per_socket - 1);
         } else { // only one worker per socket; fail in this case 
-            return; 
+            return -1;
         }
         n = w->l->local_min_worker + socket_offset;
-        if (n == w->self) { ++n; }
+        if (n >= w->self) { ++n; }
     } else {
         // ANGE XXX: don't do the -1 in this case
         if(w->g->workers_per_socket > 1) {
@@ -1145,12 +1150,13 @@ static void random_steal(__cilkrts_worker *w)
          * This starts over at p/4 on ANY success.
          */
         if(w->l->locality_steal_attempt < (w->g->P/4) // less than p/4 steal attempts
-           || w->g->disable_nonlocal_steal) { // or nonlocal steal disabled
+                || w->g->disable_nonlocal_steal) { // or nonlocal steal disabled
             /* pick random *other* victim */
             socket_offset = steal_rand % (w->g->workers_per_socket-1); //mod # of cores per socket
             n = w->l->local_min_worker + socket_offset;
             if(n >= w->self) { ++n; }
         } else if (w->l->locality_steal_attempt < (w->g->P/2)) { // less than p/2 steal attempts
+            // ANGE XXX: What are we doing here??
             socket_offset = steal_rand % (w->g->workers_per_socket << 1); //mod # of cores per socket
             // randomly pick between higher and lower neighbors
             if(socket_offset < w->g->workers_per_socket) {
@@ -1162,6 +1168,35 @@ static void random_steal(__cilkrts_worker *w)
         // less than P/4 + P/2 steal attempts will fall through and used the random n
     }
 #endif
+
+    return n;
+}
+
+static void random_steal(__cilkrts_worker *w)
+{
+    __cilkrts_worker *victim = NULL;
+    // use a place holder for now and create the fiber after we figure out
+    // who actually gets the frame
+    cilk_fiber *fiber = PLACEHOLDER_FIBER; 
+
+    int n;
+    int success = 0;
+    int32_t victim_id;
+
+    // Nothing's been stolen yet. When true, this will flag
+    // setup_for_execution_pedigree to increment the pedigree
+    w->l->work_stolen = 0;
+
+    /* If the user has disabled stealing (using the debugger) we fail */
+    if (__builtin_expect(w->g->stealing_disabled, 0))
+        return;
+
+    /* If there is only one processor work can still be stolen.
+       There must be only one worker to prevent stealing. */
+    CILK_ASSERT(w->g->total_workers > 1);
+
+    n = choose_victim(w);
+    if(n == -1) return;
 
     // If we're replaying a log, override the victim.  -1 indicates that
     // we've exhausted the list of things this worker stole when we recorded
@@ -1185,6 +1220,7 @@ static void random_steal(__cilkrts_worker *w)
 
     /* Attempt to steal work from the victim */
     if (worker_trylock_other(w, victim)) {
+        /* ANGE XXX: this is a bug; remove
         if (w->l->type == WORKER_USER) {
 
             // Fail to steal if this is a user worker and the victim is not
@@ -1200,12 +1236,20 @@ static void random_steal(__cilkrts_worker *w)
             // holds it.
             NOTE_INTERVAL(w, INTERVAL_STEAL_FAIL_USER_WORKER);
 
-        } else if (victim->l->frame_ff) {
-            // A successful steal will change victim->frame_ff, even
-            // though the victim may be executing.  Thus, the lock on
-            // the victim's deque is also protecting victim->frame_ff.
-            if (dekker_protocol(victim)) {
-                int proceed_with_steal = 1; // optimistic
+        } else */
+        if (victim->l->frame_ff) {
+            if (victim->l->next_frame_ff) {
+                BEGIN_WITH_WORKER_LOCK(w) {
+                    if(w->l->next_frame_ff == NULL) {
+                        transfer_next_frame(victim, w);
+                    }
+                } END_WITH_WORKER_LOCK(w);
+                success = 1;
+            } else if (dekker_protocol(victim)) {
+              // A successful steal will change victim->frame_ff, even
+              // though the victim may be executing.  Thus, the lock on
+              // the victim's deque is also protecting victim->frame_ff.
+              int proceed_with_steal = 1; // optimistic
 
                 // If we're replaying a log, verify that this the correct frame
                 // to steal from the victim
@@ -2901,18 +2945,18 @@ void __cilkrts_return(__cilkrts_worker *w)
             finalize_child_for_call(w, parent_ff, ff);
         } END_WITH_FRAME_LOCK(w, parent_ff);
 
-        ff = pop_next_frame(w);
+        ff = pop_next_frame_locked(w);
         /* ff will be non-null except when the parent frame is owned
            by another worker.
            CILK_ASSERT(ff)
-        */
+           */
         CILK_ASSERT(!w->l->frame_ff);
         if (ff) {
-            BEGIN_WITH_FRAME_LOCK(w, ff) {
-                __cilkrts_stack_frame *sf = ff->call_stack;
-                CILK_ASSERT(sf && !sf->call_parent);
-                setup_for_execution(w, ff, 1);
-            } END_WITH_FRAME_LOCK(w, ff);
+          BEGIN_WITH_FRAME_LOCK(w, ff) {
+            __cilkrts_stack_frame *sf = ff->call_stack;
+            CILK_ASSERT(sf && !sf->call_parent);
+            setup_for_execution(w, ff, 1);
+          } END_WITH_FRAME_LOCK(w, ff);
         }
     } END_WITH_WORKER_LOCK_OPTIONAL(w);
 

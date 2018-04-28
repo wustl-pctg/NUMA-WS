@@ -528,7 +528,7 @@ global_state_t* cilkg_get_user_settable_values()
             g->num_sockets = g->P;
             g->workers_per_socket = 1;
         } else {
-            g->workers_per_socket = g->P / 4; // ANGE XXX: updated so I can debug
+            g->workers_per_socket = g->P / g->num_sockets;
         }
     }
     
