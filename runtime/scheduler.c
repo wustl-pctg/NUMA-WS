@@ -1115,7 +1115,7 @@ static int choose_victim(__cilkrts_worker *w)
             return -1;
         }
         n = w->l->local_min_worker + socket_offset;
-        if (n >= w->self) { ++n; }
+        if (n == w->self) { ++n; }
     } else {
         if(w->g->workers_per_socket > 1) {
             socket_offset = myrand(w) % (w->g->workers_per_socket);
@@ -1138,7 +1138,7 @@ static int choose_victim(__cilkrts_worker *w)
 
     /* pick random *other* victim to begin with */
     n = steal_rand % (w->g->P - 1);
-    if (n >= w->self) { ++n; }
+    if (n == w->self) { ++n; }
 
     if(locality_rand != 0 || w->g->disable_nonlocal_steal) { // if try locality aware steal, update n
         locality_flag = 1;
