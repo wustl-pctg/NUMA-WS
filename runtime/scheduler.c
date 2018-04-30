@@ -926,18 +926,7 @@ check_frame_for_designated_socket(__cilkrts_worker *w, full_frame *ff) {
         if(w->l->my_socket_id != socket_id) {
             __cilkrts_worker *w_to_push = 
                 pick_random_worker_on_socket(w, socket_id);
-            cilk_fiber *fiber = NULL;
             transfer_next_frame(w, w_to_push);
-            // came from random steal path; allocate a fiber before pushing the frame
-            if(ff->fiber_self == NULL) { 
-                START_INTERVAL(w, INTERVAL_FIBER_ALLOCATE) {
-                    // Verify that we can get a stack.  If not, no need to continue. 
-                    fiber = cilk_fiber_allocate(&w_to_push->l->fiber_pool);
-                } STOP_INTERVAL(w, INTERVAL_FIBER_ALLOCATE);
-                CILK_ASSERT(fiber);
-                ff->fiber_self = fiber;
-                cilk_fiber_reset_state(fiber, fiber_proc_to_resume_user_code_for_random_steal);
-            }
             worker_unlock_other(w, w_to_push);
             return w_to_push; 
         }
@@ -1130,7 +1119,6 @@ static int choose_victim(__cilkrts_worker *w)
     }
 
 #else // ifndef BIN_METHOD
-    int locality_flag = 0;
     // select which type of stealing to do
     // non-locality to locality: 1-to-k ratio, need 0 ... k 
     int locality_rand = myrand(w) % (w->g->locality_ratio + 1);
@@ -1140,8 +1128,8 @@ static int choose_victim(__cilkrts_worker *w)
     n = steal_rand % (w->g->P - 1);
     if (n >= w->self) { ++n; }
 
-    if(locality_rand != 0 || w->g->disable_nonlocal_steal) { // if try locality aware steal, update n
-        locality_flag = 1;
+    // if try locality aware steal, update n
+    if(locality_rand != 0 || w->g->disable_nonlocal_steal) {
         int socket_offset = 0;
 
         /* Use different steal attempts based on previous failed attempts.
@@ -1163,8 +1151,10 @@ static int choose_victim(__cilkrts_worker *w)
             }
         }
         // less than P/4 + P/2 steal attempts will fall through and used the random n
+        w->l->locality_steal_attempt++;
     }
 #endif
+    CILK_ASSERT(n != w->self);
 
     return n;
 }
@@ -1172,12 +1162,10 @@ static int choose_victim(__cilkrts_worker *w)
 static void random_steal(__cilkrts_worker *w)
 {
     __cilkrts_worker *victim = NULL;
-    // use a place holder for now and create the fiber after we figure out
-    // who actually gets the frame
-    cilk_fiber *fiber = PLACEHOLDER_FIBER; 
 
     int n;
     int success = 0;
+    int check_socket = 1;
     int32_t victim_id;
 
     // Nothing's been stolen yet. When true, this will flag
@@ -1225,6 +1213,7 @@ static void random_steal(__cilkrts_worker *w)
                     }
                 } END_WITH_WORKER_LOCK(w);
                 success = 1;
+                check_socket = 0; // don't check in this case
             } else if (dekker_protocol(victim)) {
               // A successful steal will change victim->frame_ff, even
               // though the victim may be executing.  Thus, the lock on
@@ -1253,19 +1242,19 @@ static void random_steal(__cilkrts_worker *w)
 
                     START_INTERVAL(w, INTERVAL_STEAL_SUCCESS) {
                         success = 1;
-                        detach_for_steal(w, victim, fiber);
+                        detach_for_steal(w, victim, PLACEHOLDER_FIBER);
                         victim_id = victim->self;
 
                         #if REDPAR_DEBUG >= 1
-                        fprintf(stderr, "Wkr %d stole from victim %d, fiber = %p\n",
-                                w->self, victim->self, fiber);
+                        fprintf(stderr, "Wkr %d stole from victim %d\n",
+                                w->self, victim->self);
                         #endif
 
                         // The use of victim->self contradicts our
                         // classification of the "self" field as
                         // local.  But since this code is only for
                         // debugging, it is ok.
-                        DBGPRINTF ("%d-%p: Stealing work from worker %d\n"
+                        DBGPRINTF("%d-%p: Stealing work from worker %d\n"
                             "            sf: %p, call parent: %p\n",
                             w->self, GetCurrentFiber(), victim->self,
                             w->l->next_frame_ff->call_stack,
@@ -1277,48 +1266,32 @@ static void random_steal(__cilkrts_worker *w)
         worker_unlock_other(w, victim);
     } else { NOTE_INTERVAL(w, INTERVAL_STEAL_FAIL_LOCK); }
     
-    if(success) {
+    if(success && check_socket) {
         __cilkrts_worker *owner_w;
         BEGIN_WITH_WORKER_LOCK(w) {
-            // check_frame_for_desig_socket returns 1 if pushed to other worker
+            // check_frame_for_desig_socket returns the worker we pushed the
+            // frame  to
             owner_w = check_frame_for_designated_socket(w, w->l->next_frame_ff);
-            if(owner_w == w) {
-                START_INTERVAL(w, INTERVAL_FIBER_ALLOCATE) {
-                    // Verify that we can get a stack.  If not, no need to continue. 
-                    fiber = cilk_fiber_allocate(&w->l->fiber_pool);
-                } STOP_INTERVAL(w, INTERVAL_FIBER_ALLOCATE);
-                CILK_ASSERT(w->l->next_frame_ff && fiber);
-                w->l->next_frame_ff->fiber_self = fiber;
-                cilk_fiber_reset_state(fiber, fiber_proc_to_resume_user_code_for_random_steal);
-            }
         } END_WITH_WORKER_LOCK(w);
+        if(owner_w != w) { success = 0; }
     }
 
     // Record whether work was stolen.  When true, this will flag
     // setup_for_execution_pedigree to increment the pedigree
     w->l->work_stolen = success;
 
-    if (0 == success) {
 #ifndef BIN_METHOD
-        //fail to steal work on locality steal, add 1 to counter
-        if(locality_flag) w->l->locality_steal_attempt++;
-#endif
-    } else {
-#ifndef BIN_METHOD
+    if(success) {
         // If sucess on steal attempt, reset counter.
-		// On any sucess, the locality steal will start over at p/4
+        // On any sucess, the locality steal will start over at p/4
         w->l->locality_steal_attempt = 0;
-#endif
-        // Since our steal was successful, finish initialization of
-        // the fiber.
-        /*
-        cilk_fiber_reset_state(fiber,
-                               fiber_proc_to_resume_user_code_for_random_steal);
-        */
-        // Record the pedigree of the frame that w has stolen.
-        // record only if CILK_RECORD_LOG is set
-        replay_record_steal(w, victim_id);
     }
+#endif
+#ifdef CILK_RECORD_REPLAY
+    // Record the pedigree of the frame that w has stolen.
+    // record only if CILK_RECORD_LOG is set
+    if(success) { replay_record_steal(w, victim_id); }
+#endif
 }
 
 
@@ -1597,12 +1570,14 @@ static void setup_for_execution_exceptions(__cilkrts_worker *w,
     ff->pending_exception = NULL;
 }
 
-#if 0 /* unused */
 static void setup_for_execution_stack(__cilkrts_worker *w,
                                       full_frame *ff)
 {
+    CILK_ASSERT(ff->fiber_self == NULL);
+    CILK_ASSERT(w->l->fiber_to_free != NULL);
+    ff->fiber_self = w->l->fiber_to_free;
+    w->l->fiber_to_free = NULL;
 }
-#endif
 
 /*
  * setup_for_execution_pedigree
@@ -1638,7 +1613,6 @@ static void setup_for_execution_pedigree(__cilkrts_worker *w)
     }
 
     w->pedigree.parent = sf->parent_pedigree.parent;
-    w->l->work_stolen = 0;
 }
 
 static void setup_for_execution(__cilkrts_worker *w,
@@ -1649,7 +1623,9 @@ static void setup_for_execution(__cilkrts_worker *w,
 
     setup_for_execution_reducers(w, ff);
     setup_for_execution_exceptions(w, ff);
-    /*setup_for_execution_stack(w, ff);*/
+    if(w->l->work_stolen) {
+        setup_for_execution_stack(w, ff);
+    }
 
     ff->call_stack->worker = w;
     w->current_stack_frame = ff->call_stack;
@@ -1657,6 +1633,7 @@ static void setup_for_execution(__cilkrts_worker *w,
     // If this is a return from a call, leave the pedigree alone
     if (! is_return_from_call)
         setup_for_execution_pedigree(w);
+    w->l->work_stolen = 0;
 
     __cilkrts_setup_for_execution_sysdep(w, ff);
 
@@ -2195,6 +2172,28 @@ static cilk_fiber* worker_scheduling_loop_body(cilk_fiber* current_fiber,
     // exceptions there at this point, just don't do the check
     CILKBUG_ASSERT_NO_UNCAUGHT_EXCEPTION();
 
+    // We used to get a new fiber in random_steal, but since now we allow
+    // transfering of frames in random_steal, what we stole may or may not end
+    // up being executed on the thief.  Thus, now we instead only allocate the
+    // fiber out of a worker's pool when we are sure that this worker is
+    // executing it.
+    if(w->l->work_stolen || ff->fiber_self == NULL) {
+        // The fiber might have been pushed to this worker due to pinning; 
+        // in which case the ff->fiber_self would be NULL and we have to set 
+        // the work_stolen explicitly (which also causes pedigree to be updated)
+        w->l->work_stolen = 1;
+        cilk_fiber *fiber = NULL;
+        START_INTERVAL(w, INTERVAL_FIBER_ALLOCATE) {
+            // Verify that we can get a stack.  If not, no need to continue. 
+            fiber = cilk_fiber_allocate(&w->l->fiber_pool);
+        } STOP_INTERVAL(w, INTERVAL_FIBER_ALLOCATE);
+        CILK_ASSERT(fiber);
+        // double up on the fiber_to_free --- store the fiber that we are
+        // about to use to resume user code
+        cilk_fiber_reset_state(fiber, fiber_proc_to_resume_user_code_for_random_steal);
+        w->l->fiber_to_free = fiber;
+    }
+
     BEGIN_WITH_WORKER_LOCK(w) {
         CILK_ASSERT(!w->l->frame_ff);
         BEGIN_WITH_FRAME_LOCK(w, ff) {
@@ -2203,6 +2202,8 @@ static cilk_fiber* worker_scheduling_loop_body(cilk_fiber* current_fiber,
             setup_for_execution(w, ff, 0);
         } END_WITH_FRAME_LOCK(w, ff);
     } END_WITH_WORKER_LOCK(w);
+
+    CILK_ASSERT(ff->fiber_self);
 
     /* run it */
     //
@@ -4344,6 +4345,7 @@ execute_reductions_for_sync(__cilkrts_worker *w,
     // because it can not be leftmost.
     w->l->fiber_to_free = ff->fiber_self;
     ff->fiber_self = NULL;
+
     return w;
 }
 
