@@ -509,75 +509,75 @@ global_state_t* cilkg_get_user_settable_values()
 #endif
 
         cilkg_user_settable_values_initialized = true;
-    }
 
-    /**
-     * Locality Global Variables
-     */
-    g->num_sockets = 4; // assume 4 socket machine
-
-    if (cilkos_getenv(envstr, sizeof(envstr), "CILK_NUM_SOCKETS"))
-        // Limit to no less than 1 and no more than 4
-        store_int(&g->num_sockets, envstr, 1, 4);
-
-    if (cilkos_getenv(envstr, sizeof(envstr), "CILK_WORKERS_PER_SOCKET")) {
-        // Limit to no less than 1 and no more than 4
-        store_int(&g->workers_per_socket, envstr, 1, 8);
-    } else {
-        if(g->P <= 4) {
-            g->num_sockets = g->P;
-            g->workers_per_socket = 1;
-        } else {
-            g->workers_per_socket = g->P / g->num_sockets;
-        }
-    }
+        /**
+         * Locality Global Variables
+         */
+        g->num_sockets = 4; // assume 4 socket machine
     
-    CILK_ASSERT(g->P == g->num_sockets * g->workers_per_socket);
-    //set the number of workers now
-    // g->P = g->num_sockets * g->workers_per_socket;
-
-
-#ifdef BIN_METHOD
-    // ANGE XXX: Why not just initialize as a fraction and scale accordingly
-    // Initialize locality variables
-    g->local_percent = 50;
-    g->neighbor_percent = 33;
-    g->remote_percent = 17;
-
-    //Environment variables for locality
-    if (cilkos_getenv(envstr, sizeof(envstr), "CILK_LOCAL_PERCENT"))
-        // Limit to 0 to 100 percent
-        store_int(&g->local_percent, envstr, 0, 100);
-
-    if (cilkos_getenv(envstr, sizeof(envstr), "CILK_NEIGHBOR_PERCENT"))
-        // Limit to 0 to 100 percent
-        store_int(&g->neighbor_percent, envstr, 0, 100);
-
-    if (cilkos_getenv(envstr, sizeof(envstr), "CILK_REMOTE_PERCENT"))
-        // Limit to 0 to 100 percent
-        store_int(&g->remote_percent, envstr, 0, 100);
-
-    if(g->num_sockets == 1) {
-        printf("WARNING: You are using 1 socket. CILK_REMOTE_PERCENT and CILK_NEIGHBOR_PERCENT is ignored!\n");
-        g->remote_percent = 0;
-        g->neighbor_percent = 0;
-    } else if (g->num_sockets == 2) {
-        printf("WARNING: You are using 2 sockets. CILK_REMOTE_PERCENT is ignored!\n");
-        g->remote_percent = 0;
+        if (cilkos_getenv(envstr, sizeof(envstr), "CILK_NUM_SOCKETS"))
+            // Limit to no less than 1 and no more than 4
+            store_int(&g->num_sockets, envstr, 1, 4);
+    
+        if (cilkos_getenv(envstr, sizeof(envstr), "CILK_WORKERS_PER_SOCKET")) {
+            // Limit to no less than 1 and no more than 4
+            store_int(&g->workers_per_socket, envstr, 1, 8);
+        } else {
+            if(g->P <= 4) {
+                g->num_sockets = g->P;
+                g->workers_per_socket = 1;
+            } else {
+                g->workers_per_socket = g->P / g->num_sockets;
+            }
+        }
+        
+        CILK_ASSERT(g->P == g->num_sockets * g->workers_per_socket);
+        //set the number of workers now
+        // g->P = g->num_sockets * g->workers_per_socket;
+    
+    
+    #ifdef BIN_METHOD
+        // ANGE XXX: Why not just initialize as a fraction and scale accordingly
+        // Initialize locality variables
+        g->local_percent = 50;
+        g->neighbor_percent = 33;
+        g->remote_percent = 17;
+    
+        //Environment variables for locality
+        if (cilkos_getenv(envstr, sizeof(envstr), "CILK_LOCAL_PERCENT"))
+            // Limit to 0 to 100 percent
+            store_int(&g->local_percent, envstr, 0, 100);
+    
+        if (cilkos_getenv(envstr, sizeof(envstr), "CILK_NEIGHBOR_PERCENT"))
+            // Limit to 0 to 100 percent
+            store_int(&g->neighbor_percent, envstr, 0, 100);
+    
+        if (cilkos_getenv(envstr, sizeof(envstr), "CILK_REMOTE_PERCENT"))
+            // Limit to 0 to 100 percent
+            store_int(&g->remote_percent, envstr, 0, 100);
+    
+        if(g->num_sockets == 1) {
+            printf("WARNING: You are using 1 socket. CILK_REMOTE_PERCENT and CILK_NEIGHBOR_PERCENT is ignored!\n");
+            g->remote_percent = 0;
+            g->neighbor_percent = 0;
+        } else if (g->num_sockets == 2) {
+            printf("WARNING: You are using 2 sockets. CILK_REMOTE_PERCENT is ignored!\n");
+            g->remote_percent = 0;
+        }
+    
+    #else // ifndef BIN_METHOD
+        // Initialize locality variables
+        // ANGE XXX: modified to 1-to-k ratio for easier interpretation
+        g->locality_ratio = 2; // 2 for equal likelyhood
+    
+        // Environment variables for locality
+        if (cilkos_getenv(envstr, sizeof(envstr), "CILK_LOCALITY_RATIO"))
+            // Limit to no less than 2 (50/50) and no more than 10000
+            store_int(&g->locality_ratio, envstr, 1, 10000);
+    #endif
+    
+        g->disable_nonlocal_steal = 0;
     }
-
-#else // ifndef BIN_METHOD
-    // Initialize locality variables
-    // ANGE XXX: modified to 1-to-k ratio for easier interpretation
-    g->locality_ratio = 2; // 2 for equal likelyhood
-
-    // Environment variables for locality
-    if (cilkos_getenv(envstr, sizeof(envstr), "CILK_LOCALITY_RATIO"))
-        // Limit to no less than 2 (50/50) and no more than 10000
-        store_int(&g->locality_ratio, envstr, 1, 10000);
-#endif
-
-    g->disable_nonlocal_steal = 0;
 
     return g;
 
