@@ -47,7 +47,7 @@ COMMON_PORTABLE
 void __cilkrts_start_timing(__cilkrts_worker *w, enum timing i);
 
 COMMON_PORTABLE
-void __cilkrts_accum_timings(__cilkrts_worker *w);
+void __cilkrts_accum_timing();
 
 COMMON_PORTABLE
 void __cilkrts_drop_timing(__cilkrts_worker *w, enum timing i);

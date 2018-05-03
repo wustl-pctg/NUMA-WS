@@ -2963,10 +2963,6 @@ static void __cilkrts_unbind_thread()
         if (w) {
             g = w->g;
 
-#ifdef SCHED_STATS
-            __cilkrts_accum_timings(w);
-#endif
-
             // Matches the START in bind_thread in cilk-abi.c.
             //LIKWID_MARKER_STOP("Runtime");
             STOP_TIMING(w, INTERVAL_SCHED);
