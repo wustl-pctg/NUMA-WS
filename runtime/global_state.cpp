@@ -575,6 +575,11 @@ global_state_t* cilkg_get_user_settable_values()
             // Limit to no less than 2 (50/50) and no more than 10000
             store_int(&g->locality_ratio, envstr, 1, 10000);
     #endif
+
+        g->max_nonlocal_steal_attempts = g->P;
+        if (cilkos_getenv(envstr, sizeof(envstr), "CILK_MAX_NONLOCAL_STEAL_ATTEMPTS"))
+            // Limit to 0 to 100 percent
+            store_int(&g->max_nonlocal_steal_attempts, envstr, 0, INT_MAX);
     
         g->disable_nonlocal_steal = 0;
     }

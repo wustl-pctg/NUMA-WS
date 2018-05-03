@@ -176,18 +176,6 @@ struct full_frame
     ff_magic_t full_frame_magic_0;
 
     /**
-     * Used to serialize access to this full_frame
-     * [synchronization]
-     */
-    struct mutex lock;
-
-    /**
-     * Count of outstanding children running in parallel
-     * [self-locked]
-     */
-    int join_counter;
-
-    /**
      * If TRUE: frame was called by the parent.
      * If FALSE: frame was spawned by parent.
      * [constant]
@@ -212,6 +200,24 @@ struct full_frame
      * [constant]
      */
     full_frame *parent;
+
+    /**
+     * Used to serialize access to this full_frame
+     * [synchronization]
+     */
+    struct mutex lock;
+
+    /**
+     * Count of outstanding children running in parallel
+     * [self-locked]
+     */
+    int join_counter;
+
+    /**
+     * Count of number of failed steals from non-local worker
+     * [self-locked]
+     */
+    int failed_nonlocal_steals;
 
     /**
      * Doubly-linked list of children.  The serial execution order is
@@ -251,6 +257,13 @@ struct full_frame
      * [self-locked]
      */
     __cilkrts_stack_frame *call_stack;
+
+    /**
+     * The propagation of pinning info as steals occur 
+     *
+     * [self-locked]
+     */
+    int owner_socket_id;
 
     /**
      * Accumulated reducers of children

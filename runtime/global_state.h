@@ -277,6 +277,9 @@ struct global_state_t { /* COMMON_PORTABLE */
      */
     int num_sockets; // the number of sockets used in the computation
     int workers_per_socket; // the number of workers on each socket
+    int max_nonlocal_steal_attempts; // global config param --- if a ready frame fails to 
+          // be stolen after max_nonlocal_steal_attempts times, allow a
+          // nonlocal worker to resume it
 #ifndef BIN_METHOD
     int locality_ratio; // the denominator to determine the regular work stealing likelyhood
 #endif
