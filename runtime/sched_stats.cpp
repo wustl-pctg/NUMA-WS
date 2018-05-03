@@ -129,7 +129,14 @@ void __cilkrts_reset_timing()
 {
     global_state_t *g = cilkg_get_global_state();
     for(int i = 0; i < NUMBER_OF_STATS; ++i) {
+        //resent global counter
         g->sched_stats->time[i] = 0.0;
+
+        //reset worker local counter
+        for(int j = 0; j < g->total_workers; ++j) {
+            g->workers[j]->l->sched_stats->time[i] = 0;
+        }
+
     }
 
     LIKWID_MARKER_CLOSE;
