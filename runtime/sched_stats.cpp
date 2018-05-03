@@ -6,9 +6,10 @@
 
 #include <stdio.h>
 
-#define EXTEND_INSTRUMENT
 
 #ifdef SCHED_STATS
+
+#define EXTEND_INSTRUMENT
 
 #define calculateCycle(high,low) (((uint64_t)high<<32) | low)
 
@@ -93,7 +94,7 @@ void __cilkrts_accum_timings(__cilkrts_worker *w)
 {
     global_state_t *g = w->g;
 
-#ifndef EXTEND_INTRUMENT
+#ifndef EXTEND_INSTRUMENT
     for(int i = 0; i < NUMBER_OF_STATS; ++i) {
         for(int j = 0; j < g->total_workers; ++j) {
             uint64_t increment = 
