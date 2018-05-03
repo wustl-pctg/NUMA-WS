@@ -6,6 +6,8 @@
 
 #include <stdio.h>
 
+#define EXTEND_INSTRUMENT
+
 #ifdef SCHED_STATS
 
 #define calculateCycle(high,low) (((uint64_t)high<<32) | low)
@@ -91,6 +93,7 @@ void __cilkrts_accum_timings(__cilkrts_worker *w)
 {
     global_state_t *g = w->g;
 
+#ifndef EXTEND_INTRUMENT
     for(int i = 0; i < NUMBER_OF_STATS; ++i) {
         for(int j = 0; j < g->total_workers; ++j) {
             uint64_t increment = 
@@ -99,6 +102,20 @@ void __cilkrts_accum_timings(__cilkrts_worker *w)
             g->workers[j]->l->sched_stats->time[i] = 0;
         }
     }
+#else
+    for(int j = 0; j < g->total_workers; ++j) {
+        for(int i = 0; i < NUMBER_OF_STATS; ++i) {
+            uint64_t increment = 
+                cycleToMicroSecond(g->workers[j]->l->sched_stats->time[i]);
+            g->sched_stats->time[i] += (double) increment;
+        }
+        printf("Worker %2d=> Scheduling: %2.3f, Working: %2.3f, Idle %2.3f\n", j, 
+                MicroSecondToSecond((double)cycleToMicroSecond(g->workers[j]->l->sched_stats->time[INTERVAL_SCHED])),
+                MicroSecondToSecond((double)cycleToMicroSecond(g->workers[j]->l->sched_stats->time[INTERVAL_WORKING])),
+                MicroSecondToSecond((double)cycleToMicroSecond(g->workers[j]->l->sched_stats->time[INTERVAL_IDLE])));
+    }
+#endif
+
     fprintf(stdout, "Total Scheduling Time: %f\n", 
             MicroSecondToSecond(g->sched_stats->time[INTERVAL_SCHED]));
     fprintf(stdout, "Total Working Time: %f\n", 
