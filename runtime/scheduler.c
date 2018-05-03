@@ -109,7 +109,7 @@ extern __attribute__((noreturn))
 		void longjmp(jmp_buf, int);
 #endif
 
-#define DEBUG_LOCKS 0
+#define DEBUG_LOCKS 1
 #ifdef DEBUG_LOCKS
 // The currently executing worker must own this worker's lock
 #   define ASSERT_WORKER_LOCK_OWNED(w) \
@@ -122,6 +122,19 @@ extern __attribute__((noreturn))
         { \
             __cilkrts_worker *tls_worker = __cilkrts_get_tls_worker(); \
             CILK_ASSERT((w)->l->lock.owner != tls_worker); \
+        }
+
+// The currently executing worker must own this frame's lock
+#   define ASSERT_FRAME_LOCK_OWNED(ff) \
+        { \
+            __cilkrts_worker *tls_worker = __cilkrts_get_tls_worker(); \
+            CILK_ASSERT((ff)->lock.owner == tls_worker); \
+        }
+// The currently executing worker must NOT own this frame's lock
+#   define ASSERT_FRAME_LOCK_NOT_OWNED(ff) \
+        { \
+            __cilkrts_worker *tls_worker = __cilkrts_get_tls_worker(); \
+            CILK_ASSERT((ff)->lock.owner != tls_worker); \
         }
 #else
 #   define ASSERT_WORKER_LOCK_OWNED(w)
@@ -885,8 +898,6 @@ void fiber_proc_to_resume_user_code_for_random_steal(cilk_fiber *fiber)
 static __cilkrts_worker *pick_random_worker_on_socket(__cilkrts_worker *w,
                                                       int32_t socket_id) {
 
-    // assert: lock on w is not held but lock on w_locked is if w_locked != NULL
-    ASSERT_WORKER_LOCK_OWNED(w);
     CILK_ASSERT(w->l->my_socket_id != socket_id);
 
     __cilkrts_worker *picked_w = NULL;
@@ -903,11 +914,12 @@ static __cilkrts_worker *pick_random_worker_on_socket(__cilkrts_worker *w,
         picked_w = w->g->workers[picked_id];
         if (worker_trylock_other(w, picked_w)) { // return non-zero if succeed
             ASSERT_WORKER_LOCK_OWNED(picked_w); // invariant upon return 
+            /*
             if(picked_w->l->frame_ff || picked_w->l->next_frame_ff) {
                 // this worker is busy; give up and pick a different worker
                 worker_unlock_other(w, picked_w);
                 picked_w = NULL;
-            }
+            } */
         } else {
             picked_w = NULL;
         }
@@ -1706,9 +1718,6 @@ static void setup_for_execution(__cilkrts_worker *w,
                                 int is_return_from_call)
 {
     // ASSERT: We own w->lock and ff->lock || P == 1
-
-    CILK_ASSERT(ff->owner_socket_id == w->l->my_socket_id ||
-       ff->failed_nonlocal_steals > w->g->max_nonlocal_steal_attempts);
 
     setup_for_execution_reducers(w, ff);
     setup_for_execution_exceptions(w, ff);
@@ -3049,13 +3058,14 @@ static void __cilkrts_unbind_thread()
         if (w) {
             g = w->g;
 
+            //LIKWID_MARKER_STOP("Runtime");
+            STOP_TIMING(w, INTERVAL_SCHED);
+
 #ifdef SCHED_STATS
             __cilkrts_accum_timings(w);
 #endif
 
             // Matches the START in bind_thread in cilk-abi.c.
-            //LIKWID_MARKER_STOP("Runtime");
-            STOP_TIMING(w, INTERVAL_SCHED);
             STOP_INTERVAL(w, INTERVAL_IN_RUNTIME);
             STOP_INTERVAL(w, INTERVAL_IN_SCHEDULER);
 
