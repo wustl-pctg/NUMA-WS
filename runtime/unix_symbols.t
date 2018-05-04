@@ -31,6 +31,7 @@
 #  WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 #  POSSIBILITY OF SUCH DAMAGE.
 
+__cilkrts_accum_timing
 __cilkrts_bind_thread
 __cilkrts_bind_thread_1
 __cilkrts_bump_loop_rank

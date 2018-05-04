@@ -386,6 +386,8 @@ __CILKRTS_BEGIN_EXTERN_C
     //reset instrumentation time
     void __cilkrts_reset_timing(void);
 
+    void __cilkrts_accum_timing(void);
+
 __CILKRTS_END_EXTERN_C
 
 

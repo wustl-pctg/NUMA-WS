@@ -773,6 +773,7 @@ static full_frame *unroll_call_stack(__cilkrts_worker *w,
     sf = rev_sf;
 
     int owner_socket_id = -1;
+
     // At this point, sf should be the oldest sf in the unrolling stacklet
     if(sf->flags & CILK_FRAME_WITH_DESIGNATED_SOCKET) {
         CILK_ASSERT(sf->flags & CILK_FRAME_LAST);
@@ -1065,7 +1066,11 @@ static void detach_for_steal(__cilkrts_worker *w,
            frame LOOT.  If loot_ff == parent_ff, then we hold loot_ff->lock,
            otherwise, loot_ff is newly created and we can modify it without
            holding its lock. */
+        // parent's owner_socket_id can change after unroll_call_stack
+        int parent_old_owner_socket_id = parent_ff->owner_socket_id; 
         loot_ff = unroll_call_stack(w, parent_ff, sf);
+
+        CILK_ASSERT(parent_old_owner_socket_id != -1);
         CILK_ASSERT(loot_ff->call_stack);
 
 #if REDPAR_DEBUG >= 3
@@ -1105,6 +1110,8 @@ static void detach_for_steal(__cilkrts_worker *w,
 
         // After this "push_next_frame" call, w now owns loot_ff.
         full_frame *child_ff = make_child(w, loot_ff, 0, fiber);
+        // the child inherit parent's old owner socket id before it changes
+        child_ff->owner_socket_id = parent_old_owner_socket_id;
 
         BEGIN_WITH_FRAME_LOCK(w, child_ff) {
             /* install child in the victim's work queue, taking
@@ -3060,10 +3067,6 @@ static void __cilkrts_unbind_thread()
 
             //LIKWID_MARKER_STOP("Runtime");
             STOP_TIMING(w, INTERVAL_SCHED);
-
-#ifdef SCHED_STATS
-            __cilkrts_accum_timings(w);
-#endif
 
             // Matches the START in bind_thread in cilk-abi.c.
             STOP_INTERVAL(w, INTERVAL_IN_RUNTIME);

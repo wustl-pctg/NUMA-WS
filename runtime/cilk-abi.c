@@ -514,6 +514,7 @@ CILK_ABI_WORKER_PTR BIND_THREAD_RTN(void)
         CILK_ASSERT(ff->join_counter == 0);
         ff->join_counter = 1;
         w->l->frame_ff = ff;
+        ff->owner_socket_id = w->l->my_socket_id;
         w->reducer_map = __cilkrts_make_reducer_map(w);
         __cilkrts_set_leftmost_reducer_map(w->reducer_map, 1);
         load_pedigree_leaf_into_user_worker(w);
@@ -815,6 +816,7 @@ CILK_API_INT __cilkrts_synched(void)
 
 CILK_ABI_VOID __cilkrts_set_pinning_info(int32_t socket_id) {
     __cilkrts_worker *w = __cilkrts_get_tls_worker();
+fprintf(stderr, "Pinning called!\n");
     CILK_ASSERT(w != NULL);
     __cilkrts_stack_frame *sf = w->current_stack_frame;
     CILK_ASSERT(sf != NULL);
@@ -833,9 +835,9 @@ CILK_ABI_VOID __cilkrts_unset_pinning_info() {
 }
 
 CILK_ABI_VOID __cilkrts_disable_nonlocal_steal() {
-    __cilkrts_worker *w = __cilkrts_get_tls_worker();
-    CILK_ASSERT(w != NULL);
-    w->g->disable_nonlocal_steal = 1;
+    global_state_t *g = cilkg_get_global_state();
+    CILK_ASSERT(g != NULL);
+    g->disable_nonlocal_steal = 1;
     __cilkrts_fence();
 }
 

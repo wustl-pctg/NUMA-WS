@@ -90,9 +90,9 @@ void __cilkrts_drop_timing(__cilkrts_worker *w, enum timing i)
     }
 }
 
-void __cilkrts_accum_timings(__cilkrts_worker *w)
+void __cilkrts_accum_timing()
 {
-    global_state_t *g = w->g;
+    global_state_t *g = cilkg_get_global_state();
 
 #ifndef EXTEND_INSTRUMENT
     for(int i = 0; i < NUMBER_OF_STATS; ++i) {
