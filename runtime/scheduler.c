@@ -2159,6 +2159,7 @@ static full_frame* search_until_work_found_or_done(__cilkrts_worker *w)
             ff = check_for_work(w);
             break;
         case SCHEDULE_WAIT:            // go into wait-mode.
+            STOP_TIMING(w, INTERVAL_SCHED);
             START_INTERVAL(w, INTERVAL_SCHEDULE_WAIT);
             CILK_ASSERT(WORKER_SYSTEM == w->l->type);
             // If we are about to wait, then we better not have
@@ -2171,6 +2172,7 @@ static full_frame* search_until_work_found_or_done(__cilkrts_worker *w)
             notify_children_run(w);
             w->l->steal_failure_count = 0;
             STOP_INTERVAL(w, INTERVAL_SCHEDULE_WAIT);
+            START_TIMING(w, INTERVAL_SCHED);
             break;
         case SCHEDULE_EXIT:            // exit the scheduler.
             CILK_ASSERT(WORKER_USER != w->l->type);
