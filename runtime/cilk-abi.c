@@ -816,7 +816,6 @@ CILK_API_INT __cilkrts_synched(void)
 
 CILK_ABI_VOID __cilkrts_set_pinning_info(int32_t socket_id) {
     __cilkrts_worker *w = __cilkrts_get_tls_worker();
-fprintf(stderr, "Pinning called!\n");
     CILK_ASSERT(w != NULL);
     __cilkrts_stack_frame *sf = w->current_stack_frame;
     CILK_ASSERT(sf != NULL);
