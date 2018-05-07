@@ -111,28 +111,6 @@ COMMON_PORTABLE
 void __cilkrts_worker_unlock(__cilkrts_worker *w);
 
 /**
- * @brief Push the next full frame to be made active in this worker
- * and increment its join counter.
- *
- * __cilkrts_push_next_frame and pop_next_frame work on a one-element queue.
- * This queue is used to communicate across the runtime from the code that
- * wants to activate a frame to the code that can actually begin execution
- * on that frame.  They are asymetrical in that push increments the join
- * counter but pop does not decrement it.  Rather, a single push/pop
- * combination makes a frame active and increments its join counter once.
- *
- * @note A system worker may chose to push work onto a user worker if
- * the work is the continuation from a sync which only the user worker
- * may complete.
- *
- * @param w The worker which the frame is to be pushed onto.
- * @param ff The full_frame which is to be continued by the worker.
- */
-COMMON_PORTABLE
-void __cilkrts_push_next_frame(__cilkrts_worker *w,
-                               full_frame *ff);
-
-/**
  * @brief Sync on this worker.
  *
  * If this worker is the last to reach the sync, execution may resume

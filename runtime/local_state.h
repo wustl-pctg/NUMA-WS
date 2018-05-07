@@ -218,7 +218,7 @@ struct local_state  /* COMMON_PORTABLE */
      *
      * [shared read/write]
      */
-    struct full_frame *next_frame_ff;
+    struct full_frame *volatile next_frame_ff;
 
     /**
      * This is set iff this is a WORKER_USER and there has been a steal.  It
