@@ -1328,12 +1328,25 @@ static int try_steal_victim_next_frame_ff(__cilkrts_worker *w,
         if(ready_ff->owner_socket_id == w->l->my_socket_id) {
             goto take_frame;
         } else {
-            __cilkrts_worker *w_to_push = 
-                pick_random_worker_on_socket(w, ready_ff->owner_socket_id); 
 // fprintf(stderr, "worker %d pushing ff %p from victim %d to worker %d.\n",
 // w->self, ready_ff, victim->self, w_to_push->self);
-            transfer_next_frame(victim, w_to_push, ready_ff);
-            return 0; // failed to steal in this case
+            // transfer_next_frame(victim, w_to_push, ready_ff);
+            int steals = 0;
+            while(steals < w->g->max_nonlocal_steal_attempts) {
+                __cilkrts_worker *w_to_push = 
+                    pick_random_worker_on_socket(w, ready_ff->owner_socket_id); 
+                if (w_to_push->l->next_frame_ff) { 
+                    steals++; 
+                    continue; 
+                } else {
+                    transfer_next_frame(victim, w_to_push, ready_ff);
+                    return 0; // failed to steal in this case
+                }
+            }
+            BEGIN_WITH_FRAME_LOCK(w, ready_ff) {
+                ready_ff->failed_nonlocal_steals += steals;
+            } END_WITH_FRAME_LOCK(w, ready_ff);
+            goto take_frame;
         }
     } else if (victim->l->my_socket_id == w->l->my_socket_id) {
         goto take_frame;
