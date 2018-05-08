@@ -71,6 +71,7 @@
 
 __CILKRTS_BEGIN_EXTERN_C
 
+#define ANY_SOCKET (-1)
 
 /**
  * @brief Flag to disable parallel reductions.

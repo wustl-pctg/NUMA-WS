@@ -49,6 +49,7 @@
  **************************************************************************/
 
 #include "full_frame.h"
+#include "scheduler.h"
 #include "stats.h"
 #include "os.h"
 #include "bug.h"
@@ -72,7 +73,7 @@ full_frame *__cilkrts_make_full_frame(__cilkrts_worker *w,
         ff->left_sibling = ff->right_sibling = 0;
         ff->next = 0;
         ff->call_stack = sf;
-        ff->owner_socket_id = -1; // indicating uninit value
+        ff->owner_socket_id = ANY_SOCKET; // indicating uninit value
         ff->is_call_child = 0;
         ff->simulated_stolen = 0;
 	ff->children_reducer_map = ff->right_reducer_map = 0;

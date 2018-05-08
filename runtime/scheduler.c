@@ -548,8 +548,9 @@ static int transfer_next_frame(__cilkrts_worker *from_w,
     if(success) {
         push_next_frame_no_incjoin(to_w, ff);
 // fprintf(stderr, "worker %d transfer ff %p to worker %d.\n", from_w->self, ff, to_w->self);
-        CILK_ASSERT(ff->owner_socket_id == to_w->l->my_socket_id ||
-                    ff->failed_nonlocal_steals > to_w->g->max_nonlocal_steal_attempts);
+        CILK_ASSERT(ff->owner_socket_id == ANY_SOCKET 
+            || ff->owner_socket_id == to_w->l->my_socket_id 
+            || ff->failed_nonlocal_steals > to_w->g->max_nonlocal_steal_attempts);
     }
     return success;
 }
@@ -725,8 +726,6 @@ static full_frame *make_child(__cilkrts_worker *w,
 {
     full_frame *child_ff = __cilkrts_make_full_frame(w, child_sf);
 
-    CILK_ASSERT(parent_ff->owner_socket_id != -1);
-
     child_ff->parent = parent_ff;
     child_ff->owner_socket_id = parent_ff->owner_socket_id;
     push_child(parent_ff, child_ff);
@@ -817,17 +816,17 @@ static full_frame *unroll_call_stack(__cilkrts_worker *w,
     } while (sf);
     sf = rev_sf;
 
-    int owner_socket_id = -1;
+    int owner_socket_id = ANY_SOCKET;
 
     // At this point, sf should be the oldest sf in the unrolling stacklet
     if(sf->flags & CILK_FRAME_WITH_DESIGNATED_SOCKET) {
-        CILK_ASSERT(sf->flags & CILK_FRAME_LAST);
+        // CILK_ASSERT(sf->flags & CILK_FRAME_LAST);
         owner_socket_id = sf->size % w->g->num_sockets;
         ff->owner_socket_id = owner_socket_id;
     } else {
         owner_socket_id = ff->owner_socket_id; // should have been set already otherwise
     }
-    CILK_ASSERT(owner_socket_id != -1);
+    // CILK_ASSERT(owner_socket_id != -1);
 
     /* Promote each stack frame to a full frame in order from parent
        to child, following the reversed list we just built. */
@@ -1017,9 +1016,9 @@ static __cilkrts_worker *pick_random_worker_on_socket(__cilkrts_worker *w,
 static __cilkrts_worker *
 check_frame_for_designated_socket(__cilkrts_worker *w, full_frame *ff) {
 
-    // CILK_ASSERT(ff && w->l->next_frame_ff == ff);
-    CILK_ASSERT(ff->owner_socket_id != -1);
-    
+    // if the user doesn't set anything, it's free for all
+    if(ff->owner_socket_id == ANY_SOCKET) { return NULL; }
+
     int socket_id = ff->owner_socket_id;
     if(w->l->my_socket_id != socket_id) {
         __cilkrts_worker *w_to_push = 
@@ -1078,7 +1077,10 @@ static int check_frame_for_sync_master(__cilkrts_worker *w, full_frame *ff) {
         __cilkrts_worker *sync_master = ff->sync_master;
         // ANGE: Can't do it here; or it would be stolen by others
         // unset_sync_master(sync_master, ff);
-        ff->owner_socket_id = sync_master->l->my_socket_id;
+        if( w->g->pin_top_level_frame_at_socket != ANY_SOCKET ) {
+            CILK_ASSERT(w->g->pin_top_level_frame_at_socket == sync_master->l->my_socket_id);
+            ff->owner_socket_id = sync_master->l->my_socket_id;
+        }
         if(sync_master != w) {
             // transfer_next_frame(w, sync_master);
             push_next_frame(sync_master, ff);
@@ -1140,7 +1142,6 @@ static int detach_for_steal(__cilkrts_worker *w,
         int parent_old_owner_socket_id = parent_ff->owner_socket_id; 
         loot_ff = unroll_call_stack(w, parent_ff, sf);
 
-        CILK_ASSERT(parent_old_owner_socket_id != -1);
         CILK_ASSERT(loot_ff->call_stack);
 
 #if REDPAR_DEBUG >= 3
@@ -1318,9 +1319,10 @@ static int try_steal_victim_next_frame_ff(__cilkrts_worker *w,
     int success = 0;
 
     full_frame *ready_ff = victim->l->next_frame_ff;
-    CILK_ASSERT(ready_ff->owner_socket_id != -1);
 
     CILK_ASSERT(!(ready_ff->sync_master && __cilkrts_check_synched(ready_ff)));
+
+    if (ready_ff->owner_socket_id == ANY_SOCKET) { goto take_frame; }
 
     if (ready_ff->owner_socket_id != victim->l->my_socket_id) {
         // victim has work to do; push this frame to the right socket
@@ -1482,11 +1484,10 @@ static void random_steal(__cilkrts_worker *w)
     // setup_for_execution_pedigree to increment the pedigree
     w->l->work_stolen = success;
 
-    if(success) {
-        full_frame *ff = w->l->next_frame_ff;
-        CILK_ASSERT(ff->owner_socket_id == w->l->my_socket_id ||
-            ff->failed_nonlocal_steals > w->g->max_nonlocal_steal_attempts);
-    }
+    full_frame *ff = w->l->next_frame_ff;
+    CILK_ASSERT(ff == NULL || ff->owner_socket_id == ANY_SOCKET 
+            || ff->owner_socket_id == w->l->my_socket_id 
+            || ff->failed_nonlocal_steals > w->g->max_nonlocal_steal_attempts);
 
 #ifndef BIN_METHOD
     if(success) {
@@ -2246,8 +2247,9 @@ static full_frame* check_for_work(__cilkrts_worker *w)
             // Reset steal_failure_count since there is obviously still work to
             // be done.
             w->l->steal_failure_count = 0;
-            CILK_ASSERT(ff->owner_socket_id == w->l->my_socket_id ||
-                ff->failed_nonlocal_steals > w->g->max_nonlocal_steal_attempts);
+            CILK_ASSERT(ff->owner_socket_id == ANY_SOCKET 
+                || ff->owner_socket_id == w->l->my_socket_id 
+                || ff->failed_nonlocal_steals > w->g->max_nonlocal_steal_attempts);
         }
     }
     //LIKWID_MARKER_START("Runtime");
@@ -2384,8 +2386,9 @@ static cilk_fiber* worker_scheduling_loop_body(cilk_fiber* current_fiber,
 // fprintf(stderr, "worker %d, w %p, ff %p, sync_master %p.\n", w->self, w, ff, ff->sync_master);
 
 // fprintf(stderr, "worker %d got ff %p fiber %p from search_until.\n", w->self, ff, ff->fiber_self);
-        CILK_ASSERT(ff->owner_socket_id == w->l->my_socket_id ||
-            ff->failed_nonlocal_steals > w->g->max_nonlocal_steal_attempts);
+        CILK_ASSERT(ff->owner_socket_id == ANY_SOCKET 
+            || ff->owner_socket_id == w->l->my_socket_id 
+            || ff->failed_nonlocal_steals > w->g->max_nonlocal_steal_attempts);
     } else {
 // fprintf(stderr, "worker %d got ff %p fiber %p from pop next.\n", w->self, ff, ff->fiber_self);
     }
