@@ -383,10 +383,15 @@ __CILKRTS_BEGIN_EXTERN_C
     /// about using __declspec(nothrow) after the "void *" return type
     typedef void * __cilkrts_void_ptr;
 
+#ifdef SCHED_STATS
     //reset instrumentation time
-    void __cilkrts_reset_timing(void);
+    void __cilkrts_reset_timing();
 
-    void __cilkrts_accum_timing(void);
+    void __cilkrts_accum_timing();
+#else
+#define __cilkrts_reset_timing()
+#define __cilkrts_accum_timing()
+#endif
 
 __CILKRTS_END_EXTERN_C
 
