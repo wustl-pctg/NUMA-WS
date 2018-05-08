@@ -1064,6 +1064,8 @@ check_frame_for_designated_socket(__cilkrts_worker *w, full_frame *ff) {
  */
 static int check_frame_for_sync_master(__cilkrts_worker *w, full_frame *ff) {
 
+    CILK_ASSERT(ff && ff->call_stack);
+
     // If the original owner wants this frame back (to resume
     // it on its original thread) pass it back now.
     if (NULL != ff->sync_master) {
@@ -1078,8 +1080,13 @@ static int check_frame_for_sync_master(__cilkrts_worker *w, full_frame *ff) {
         // ANGE: Can't do it here; or it would be stolen by others
         // unset_sync_master(sync_master, ff);
         if( w->g->pin_top_level_frame_at_socket != ANY_SOCKET ) {
-            CILK_ASSERT(w->g->pin_top_level_frame_at_socket == sync_master->l->my_socket_id);
-            ff->owner_socket_id = sync_master->l->my_socket_id;
+            // CILK_ASSERT(w->g->pin_top_level_frame_at_socket == sync_master->l->my_socket_id);
+            __cilkrts_stack_frame *sf = ff->call_stack;
+            if(sf->flags & CILK_FRAME_WITH_DESIGNATED_SOCKET) {
+                ff->owner_socket_id = sf->size % w->g->num_sockets;
+            } else {
+                ff->owner_socket_id = ANY_SOCKET;
+            }
         }
         if(sync_master != w) {
             // transfer_next_frame(w, sync_master);
