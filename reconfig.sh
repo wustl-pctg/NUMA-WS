@@ -4,7 +4,7 @@ aclocal
 automake --add-missing
 autoconf
 ./configure --prefix=`pwd`/.. \
-CC=/usr/local/llvm-cilk/bin/clang \
-CXX=/usr/local/llvm-cilk/bin/clang++ \
+CC=/usr/local/tapir/build/bin/clang \
+CXX=/usr/local/tapir/build/bin/clang++ \
 CFLAGS='-g -O3 -DSCHED_STATS' CXXFLAGS='-g -O3 -DSCHED_STATS' \
 LIBS="-lpthread -lrt -lm -ldl"
