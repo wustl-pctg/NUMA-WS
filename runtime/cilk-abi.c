@@ -490,9 +490,12 @@ CILK_ABI_WORKER_PTR BIND_THREAD_RTN(void)
     if (__builtin_expect(g->work_done, 0))
         __cilkrts_bug("Attempt to enter Cilk while Cilk is shutting down");
     w = find_free_worker(g);
+
+    int initial_socket = g->pin_top_level_frame_at_socket;
     CILK_ASSERT(w);
     CILK_ASSERT(w->self == 0);
-    CILK_ASSERT(w->l->my_socket_id == 0);
+    CILK_ASSERT(initial_socket == ANY_SOCKET 
+        || w->l->my_socket_id == initial_socket);
 
     __cilkrts_set_tls_worker(w);
     __cilkrts_cilkscreen_establish_worker(w);
@@ -514,7 +517,9 @@ CILK_ABI_WORKER_PTR BIND_THREAD_RTN(void)
         CILK_ASSERT(ff->join_counter == 0);
         ff->join_counter = 1;
         w->l->frame_ff = ff;
-        ff->owner_socket_id = w->l->my_socket_id;
+        if( initial_socket != ANY_SOCKET) {
+            ff->owner_socket_id = w->l->my_socket_id;
+        }
         w->reducer_map = __cilkrts_make_reducer_map(w);
         __cilkrts_set_leftmost_reducer_map(w->reducer_map, 1);
         load_pedigree_leaf_into_user_worker(w);
@@ -814,6 +819,14 @@ CILK_API_INT __cilkrts_synched(void)
     return 1 == ff->join_counter;
 }
 
+CILK_ABI_VOID __cilkrts_pin_top_level_frame_at_socket(int32_t socket_id) {
+    global_state_t *g = cilkg_get_global_state();
+    CILK_ASSERT(g != NULL);
+    g->pin_top_level_frame_at_socket = socket_id;
+    // should call this function before we enter the top level frame
+    CILK_ASSERT(__cilkrts_get_tls_worker() == NULL);
+}
+
 CILK_ABI_VOID __cilkrts_set_pinning_info(int32_t socket_id) {
     __cilkrts_worker *w = __cilkrts_get_tls_worker();
     CILK_ASSERT(w != NULL);
@@ -831,6 +844,7 @@ CILK_ABI_VOID __cilkrts_unset_pinning_info() {
     CILK_ASSERT(sf != NULL);
 
     sf->flags &= ~CILK_FRAME_WITH_DESIGNATED_SOCKET;
+    sf->size = ANY_SOCKET;
 }
 
 CILK_ABI_VOID __cilkrts_disable_nonlocal_steal() {

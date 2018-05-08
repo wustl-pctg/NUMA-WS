@@ -56,6 +56,7 @@
 #include "cilk_malloc.h"
 #include "record-replay.h"
 #include "numa.h"
+#include "scheduler.h"
 
 #include <algorithm>  // For max()
 #include <cstring>
@@ -644,6 +645,7 @@ global_state_t* cilkg_init_global_state()
 
     // Number of bytes/address - validation for debugger integration
     g->addr_size = sizeof(void *);
+    g->pin_top_level_frame_at_socket = ANY_SOCKET; // default; could be reset by user 
 
     __cilkrts_init_stats(&g->stats);
 

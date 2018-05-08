@@ -135,6 +135,8 @@ struct global_state_t { /* COMMON_PORTABLE */
 
     uint16_t version;   ///< Version of this structure (fixed)
 
+    int pin_top_level_frame_at_socket; ///< where the top level frame should be pinned
+
     int system_workers; ///< Number of system workers (fixed)
 
     /**
