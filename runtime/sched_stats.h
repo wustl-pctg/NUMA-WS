@@ -69,5 +69,4 @@ void __cilkrts_reset_timing();
 #endif // SCHED_STATS
 
 __CILKRTS_END_EXTERN_C
-
 #endif // __SCHED_STATS_HEADER__

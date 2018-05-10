@@ -142,4 +142,8 @@ void __cilkrts_reset_timing()
     LIKWID_MARKER_CLOSE;
     LIKWID_MARKER_INIT;
 }
+
+#else
+void __cilkrts_accum_timing(){}
+void __cilkrts_reset_timing(){}
 #endif
