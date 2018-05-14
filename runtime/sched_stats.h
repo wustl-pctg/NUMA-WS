@@ -6,25 +6,29 @@
 #ifndef __SCHED_STATS_HEADER__
 #define __SCHED_STATS_HEADER__
 
-#define NUMBER_OF_STATS 3
-
 __CILKRTS_BEGIN_EXTERN_C
 
 #ifdef SCHED_STATS
 enum timing
 {
-    INTERVAL_SCHED, //Scheduler Overhead
+    INTERVAL_SCHED = 0, //Scheduler Overhead
     INTERVAL_WORK_INFLATION, //Work inflation measurement
     INTERVAL_IDLE, // Idle time
+    INTERVAL_WORK_LOCAL, // time spent working on local items
+    INTERVAL_WORK_REMOTE, // time spent working on remote items
+    INTERVAL_WORK_UNPINNED, // time spent working on remote items
+    NUMBER_OF_STATS // always keep this as the last
 };
 
 typedef struct sched_stats
 {
-    volatile uint64_t time[NUMBER_OF_STATS]; // Total time measured for all stats
-
-    volatile uint64_t begin[NUMBER_OF_STATS]; // Begin time of current measurement
-
-    volatile uint64_t end[NUMBER_OF_STATS];  // End time of current measurement
+    enum timing last_user_code_op; // type of frame this worker set up last
+    uint32_t total_steals; // total number of steals including the following two
+    uint32_t successful_steals_pushed; // steals that results work pushed
+    uint32_t successful_steals; // steal that results work
+    uint64_t time[NUMBER_OF_STATS]; // Total time measured for all stats
+    uint64_t begin[NUMBER_OF_STATS]; // Begin time of current measurement
+    uint64_t end[NUMBER_OF_STATS];  // End time of current measurement
 } stats;
 
 typedef struct total_stats

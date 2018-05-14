@@ -532,6 +532,10 @@ global_state_t* cilkg_get_user_settable_values()
             }
         }
         
+        if (!cilkos_getenv(envstr, sizeof(envstr), "CILK_NWORKERS")) {
+            g->P = g->num_sockets * g->workers_per_socket;
+        }
+
         CILK_ASSERT(g->P == g->num_sockets * g->workers_per_socket);
         //set the number of workers now
         // g->P = g->num_sockets * g->workers_per_socket;
@@ -577,7 +581,7 @@ global_state_t* cilkg_get_user_settable_values()
             store_int(&g->locality_ratio, envstr, 1, 10000);
     #endif
 
-        g->max_nonlocal_steal_attempts = 8; // make it a constant for now
+        g->max_nonlocal_steal_attempts = 4; // make it a constant for now
         if (cilkos_getenv(envstr, sizeof(envstr), "CILK_MAX_NONLOCAL_STEAL_ATTEMPTS"))
             // Limit to 0 to 100 percent
             store_int(&g->max_nonlocal_steal_attempts, envstr, 0, INT_MAX);

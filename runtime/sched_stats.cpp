@@ -14,7 +14,7 @@
 #define calculateCycle(high,low) (((uint64_t)high<<32) | low)
 
 #define cycleToSecond(cycle) ((double)cycle/(double)2200000000.0)
-#define cycleToMicroSecond(cycle) (cycle/2200)
+#define cycleToMicroSecond(cycle) ((double)cycle/(double)2200.0)
 #define MicroSecondToSecond(MicroSecond) ((double)MicroSecond/(double)1000000)
 
 uint64_t beginCycleCount(){
@@ -45,6 +45,10 @@ void __cilkrts_init_sched_stats(stats *s)
         s->begin[i] = 0;
         s->end[i] = 0;
         s->time[i] = 0;
+        s->last_user_code_op = INTERVAL_WORK_UNPINNED; // default 
+        s->total_steals = 0;
+        s->successful_steals = 0;
+        s->successful_steals_pushed = 0;
     }
 }
 
@@ -74,8 +78,12 @@ void __cilkrts_stop_timing(__cilkrts_worker *w, enum timing i)
         stats *s = w->l->sched_stats;
         CILK_ASSERT(s->end[i] == 0);
         s->end[i] = endCycleCount();
-        if (s->end > s->begin) {
-            s->time[i] += (s->end[i] - s->begin[i]);
+        uint64_t elapsed = s->end[i] - s->begin[i];
+        if (elapsed > 0) {
+            s->time[i] += elapsed;
+            if(i == INTERVAL_WORK_INFLATION) {
+                s->time[s->last_user_code_op] += elapsed;
+            }
         }
         s->begin[i] = 0; 
     }
@@ -97,30 +105,40 @@ void __cilkrts_accum_timing()
 #ifndef EXTEND_INSTRUMENT
     for(int i = 0; i < NUMBER_OF_STATS; ++i) {
         for(int j = 0; j < g->total_workers; ++j) {
-            uint64_t increment = 
+            double increment = 
                 cycleToMicroSecond(g->workers[j]->l->sched_stats->time[i]);
-            g->sched_stats->time[i] += (double) increment;
+            g->sched_stats->time[i] += increment;
             g->workers[j]->l->sched_stats->time[i] = 0;
         }
     }
 #else
     for(int j = 0; j < g->total_workers; ++j) {
+        struct sched_stats *wstats = g->workers[j]->l->sched_stats;
         for(int i = 0; i < NUMBER_OF_STATS; ++i) {
-            uint64_t increment = 
-                cycleToMicroSecond(g->workers[j]->l->sched_stats->time[i]);
-            g->sched_stats->time[i] += (double) increment;
+            double increment = cycleToMicroSecond(wstats->time[i]);
+            g->sched_stats->time[i] += increment;
         }
-        printf("Worker %2d=> Scheduling: %2.3f, Working: %2.3f, Idle %2.3f\n", j, 
-                MicroSecondToSecond((double)cycleToMicroSecond(g->workers[j]->l->sched_stats->time[INTERVAL_SCHED])),
-                MicroSecondToSecond((double)cycleToMicroSecond(g->workers[j]->l->sched_stats->time[INTERVAL_WORKING])),
-                MicroSecondToSecond((double)cycleToMicroSecond(g->workers[j]->l->sched_stats->time[INTERVAL_IDLE])));
+        printf("Worker %2d=> Scheduling: %2.3f, Working: %2.3f (%2.3f(l)/%2.3f(r)/%2.3f(u)), Idle %2.3f, steals: %u(p)/%u(s)/%u\n",
+               j, 
+               cycleToSecond(wstats->time[INTERVAL_SCHED]),
+               cycleToSecond(wstats->time[INTERVAL_WORK_INFLATION]),
+               cycleToSecond(wstats->time[INTERVAL_WORK_LOCAL]),
+               cycleToSecond(wstats->time[INTERVAL_WORK_REMOTE]),
+               cycleToSecond(wstats->time[INTERVAL_WORK_UNPINNED]),
+               cycleToSecond(wstats->time[INTERVAL_IDLE]), 
+               wstats->successful_steals_pushed, 
+               wstats->successful_steals, 
+               wstats->total_steals);
     }
 #endif
 
     fprintf(stdout, "Total Scheduling Time: %f\n", 
             MicroSecondToSecond(g->sched_stats->time[INTERVAL_SCHED]));
-    fprintf(stdout, "Total Working Time: %f\n", 
-            MicroSecondToSecond(g->sched_stats->time[INTERVAL_WORKING]));
+    fprintf(stdout, "Total Working Time: %f (%f(l)/%f(r)/%f(u))\n", 
+            MicroSecondToSecond(g->sched_stats->time[INTERVAL_WORK_INFLATION]),
+            MicroSecondToSecond(g->sched_stats->time[INTERVAL_WORK_LOCAL]),
+            MicroSecondToSecond(g->sched_stats->time[INTERVAL_WORK_REMOTE]),
+            MicroSecondToSecond(g->sched_stats->time[INTERVAL_WORK_UNPINNED]));
     fprintf(stdout, "Total Idle Time: %f\n", 
             MicroSecondToSecond(g->sched_stats->time[INTERVAL_IDLE]));
 }
