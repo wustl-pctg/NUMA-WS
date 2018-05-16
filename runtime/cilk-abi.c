@@ -517,9 +517,8 @@ CILK_ABI_WORKER_PTR BIND_THREAD_RTN(void)
         CILK_ASSERT(ff->join_counter == 0);
         ff->join_counter = 1;
         w->l->frame_ff = ff;
-        if( initial_socket != ANY_SOCKET) {
-            ff->owner_socket_id = w->l->my_socket_id;
-        }
+        ff->owner_socket_id = initial_socket;
+
         w->reducer_map = __cilkrts_make_reducer_map(w);
         __cilkrts_set_leftmost_reducer_map(w->reducer_map, 1);
         load_pedigree_leaf_into_user_worker(w);

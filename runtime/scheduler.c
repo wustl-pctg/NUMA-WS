@@ -469,6 +469,30 @@ static void push_next_frame(__cilkrts_worker *w, full_frame *ff)
     } while(!swapped);
 }
 
+/* only push if the next frame is NULL
+ * return 1 if pushed and 0 otherwise
+ */
+static int push_next_frame_if_null(__cilkrts_worker *w, full_frame *ff)
+{
+    // sometimes we push a frame in detach_for_steal, and it's a newly created
+    // frame so no need to lock in that case
+    // ASSERT_FRAME_LOCK_OWNED(ff); 
+    CILK_ASSERT(ff);
+    CILK_ASSERT(ff->next == NULL);
+    incjoin(ff);
+    
+    // Last in first out
+    int pushed = 0;
+
+    full_frame *curr = w->l->next_frame_ff;
+    if(curr == NULL) {
+        pushed = __sync_bool_compare_and_swap(&(w->l->next_frame_ff), curr, ff);
+    }
+
+    if(pushed == 0) { decjoin(ff); }
+    return pushed;
+}
+
 /* same as push_next_frame but does not increment the join counter */
 static void push_next_frame_no_incjoin(__cilkrts_worker *w, full_frame *ff)
 {
@@ -537,7 +561,7 @@ static int transfer_next_frame(__cilkrts_worker *from_w,
         push_next_frame_no_incjoin(to_w, ff);
         CILK_ASSERT(ff->owner_socket_id == ANY_SOCKET 
             || ff->owner_socket_id == to_w->l->my_socket_id 
-            || ff->failed_nonlocal_steals > to_w->g->max_nonlocal_steal_attempts);
+            || ff->failed_nonlocal_steals >= to_w->g->max_nonlocal_steal_attempts);
     }
     return success;
 }
@@ -1003,15 +1027,27 @@ check_frame_for_designated_socket(__cilkrts_worker *w, full_frame *ff) {
     // if the user doesn't set anything, it's free for all
     if(ff->owner_socket_id == ANY_SOCKET) { return NULL; }
 
+    CILK_ASSERT(ff->failed_nonlocal_steals == 0);
+    ASSERT_FRAME_LOCK_OWNED(ff);
+    __cilkrts_worker *w_to_push = NULL;
+
     int socket_id = ff->owner_socket_id;
     if(w->l->my_socket_id != socket_id) {
-        __cilkrts_worker *w_to_push = 
-            pick_random_worker_on_socket(w, socket_id);
-        // transfer_next_frame(w, w_to_push);
-        push_next_frame(w_to_push, ff);
-        return w_to_push; 
+
+        int tries = 0;
+        while(tries < w->g->max_nonlocal_steal_attempts) {
+            w_to_push = pick_random_worker_on_socket(w, ff->owner_socket_id); 
+            int res = push_next_frame_if_null(w_to_push, ff);
+            if(res) {
+                break; 
+            } else {
+                tries++;
+                w_to_push = NULL;
+            }
+        }
+        ff->failed_nonlocal_steals += tries;
     }
-    return NULL;
+    return w_to_push;
 }
 
 #if 0 // old check_frame_for_designated_socket
@@ -1069,7 +1105,10 @@ static int check_frame_for_sync_master(__cilkrts_worker *w, full_frame *ff) {
             } else {
                 ff->owner_socket_id = ANY_SOCKET;
             }
+        } else {
+            ff->owner_socket_id = ANY_SOCKET;
         }
+
         if(sync_master != w) {
             // transfer_next_frame(w, sync_master);
             push_next_frame(sync_master, ff);
@@ -1193,10 +1232,19 @@ static int detach_for_steal(__cilkrts_worker *w,
              * the join counter before releasing lock on it; otherwise some other
              * worker may provably good steal parent_ff when it's not ready.
              */
-            if(!check_frame_for_designated_socket(w, loot_ff)) {
-                push_next_frame(w, loot_ff);
-                success = 1;
-             }
+            if(loot_ff == parent_ff) {
+                if(!check_frame_for_designated_socket(w, loot_ff)) {
+                    push_next_frame(w, loot_ff);
+                    success = 1;
+                }
+            } else {
+                BEGIN_WITH_FRAME_LOCK(w, loot_ff) {
+                    if(!check_frame_for_designated_socket(w, loot_ff)) {
+                        push_next_frame(w, loot_ff);
+                        success = 1;
+                    }
+                } END_WITH_FRAME_LOCK(w, loot_ff);
+            }
         }
     } END_WITH_FRAME_LOCK(w, parent_ff);
 
@@ -1471,7 +1519,7 @@ static void random_steal(__cilkrts_worker *w)
     full_frame *ff = w->l->next_frame_ff;
     CILK_ASSERT(ff == NULL || ff->owner_socket_id == ANY_SOCKET 
             || ff->owner_socket_id == w->l->my_socket_id 
-            || ff->failed_nonlocal_steals > w->g->max_nonlocal_steal_attempts);
+            || ff->failed_nonlocal_steals >= w->g->max_nonlocal_steal_attempts);
 
 #ifndef BIN_METHOD
     if(success) {
@@ -2241,7 +2289,7 @@ static full_frame* check_for_work(__cilkrts_worker *w)
             w->l->steal_failure_count = 0;
             CILK_ASSERT(ff->owner_socket_id == ANY_SOCKET 
                 || ff->owner_socket_id == w->l->my_socket_id 
-                || ff->failed_nonlocal_steals > w->g->max_nonlocal_steal_attempts);
+                || ff->failed_nonlocal_steals >= w->g->max_nonlocal_steal_attempts);
         }
     }
     //LIKWID_MARKER_START("Runtime");
@@ -2377,7 +2425,7 @@ static cilk_fiber* worker_scheduling_loop_body(cilk_fiber* current_fiber,
 
         CILK_ASSERT(ff->owner_socket_id == ANY_SOCKET 
             || ff->owner_socket_id == w->l->my_socket_id 
-            || ff->failed_nonlocal_steals > w->g->max_nonlocal_steal_attempts);
+            || ff->failed_nonlocal_steals >= w->g->max_nonlocal_steal_attempts);
     }
 
     // unset sync master here
