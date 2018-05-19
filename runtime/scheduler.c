@@ -1097,7 +1097,7 @@ static int check_frame_for_sync_master(__cilkrts_worker *w, full_frame *ff) {
         __cilkrts_worker *sync_master = ff->sync_master;
         // ANGE: Can't do it here; or it would be stolen by others
         // unset_sync_master(sync_master, ff);
-        if( w->g->pin_top_level_frame_at_socket != ANY_SOCKET ) {
+        // if( w->g->pin_top_level_frame_at_socket != ANY_SOCKET ) {
             // CILK_ASSERT(w->g->pin_top_level_frame_at_socket == sync_master->l->my_socket_id);
             __cilkrts_stack_frame *sf = ff->call_stack;
             if(sf->flags & CILK_FRAME_WITH_DESIGNATED_SOCKET) {
@@ -1105,9 +1105,9 @@ static int check_frame_for_sync_master(__cilkrts_worker *w, full_frame *ff) {
             } else {
                 ff->owner_socket_id = ANY_SOCKET;
             }
-        } else {
+        /* } else {
             ff->owner_socket_id = ANY_SOCKET;
-        }
+        } */
 
         if(sync_master != w) {
             // transfer_next_frame(w, sync_master);
@@ -2322,7 +2322,7 @@ static full_frame* search_until_work_found_or_done(__cilkrts_worker *w)
             CILK_ASSERT(WORKER_SYSTEM == w->l->type);
             // If we are about to wait, then we better not have
             // a frame that we should execute...
-            CILK_ASSERT(NULL == w->l->next_frame_ff);
+            // CILK_ASSERT(NULL == w->l->next_frame_ff);
             notify_children_wait(w);
             signal_node_wait(w->l->signal_node);
             // ...
