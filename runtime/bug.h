@@ -70,6 +70,8 @@ __CILKRTS_BEGIN_EXTERN_C
  */
 COMMON_PORTABLE NORETURN __cilkrts_bug(const char *fmt,...) cilk_nothrow;
 
+#define CILK_ASSERT
+
 #ifndef CILK_ASSERT
 
 /** Standard text for failed assertion */
