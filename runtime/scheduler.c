@@ -832,8 +832,12 @@ static full_frame *unroll_call_stack(__cilkrts_worker *w,
     // At this point, sf should be the oldest sf in the unrolling stacklet
     if(sf->flags & CILK_FRAME_WITH_DESIGNATED_SOCKET) {
         // CILK_ASSERT(sf->flags & CILK_FRAME_LAST);
-        owner_socket_id = sf->size % w->g->num_sockets;
-        ff->owner_socket_id = owner_socket_id;
+        if(sf->size != ANY_SOCKET) { 
+            owner_socket_id = sf->size % w->g->num_sockets;
+            ff->owner_socket_id = owner_socket_id;
+        } else {
+            ff->owner_socket_id = ANY_SOCKET;
+        }
     } else {
         owner_socket_id = ff->owner_socket_id; // should have been set already otherwise
     }
@@ -1898,6 +1902,8 @@ static void setup_for_execution(__cilkrts_worker *w,
     else if(ff->owner_socket_id == w->l->my_socket_id) {
         w->l->sched_stats->last_user_code_op = INTERVAL_WORK_LOCAL;
     } else {
+        // fprintf(stderr, "I am on socket %d, resume work for socket %d.\n", 
+        //         w->l->my_socket_id, ff->owner_socket_id);
         w->l->sched_stats->last_user_code_op = INTERVAL_WORK_REMOTE;
     }
 #endif

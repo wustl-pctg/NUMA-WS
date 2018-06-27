@@ -842,7 +842,8 @@ CILK_ABI_VOID __cilkrts_unset_pinning_info() {
     __cilkrts_stack_frame *sf = w->current_stack_frame;
     CILK_ASSERT(sf != NULL);
 
-    sf->flags &= ~CILK_FRAME_WITH_DESIGNATED_SOCKET;
+    // sf->flags &= ~CILK_FRAME_WITH_DESIGNATED_SOCKET;
+    sf->flags |= CILK_FRAME_WITH_DESIGNATED_SOCKET;
     sf->size = ANY_SOCKET;
 }
 

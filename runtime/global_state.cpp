@@ -544,9 +544,9 @@ global_state_t* cilkg_get_user_settable_values()
     #ifdef BIN_METHOD
         // ANGE XXX: Why not just initialize as a fraction and scale accordingly
         // Initialize locality variables
-        g->local_percent = 50;
-        g->neighbor_percent = 33;
-        g->remote_percent = 17;
+        g->local_percent = 70;
+        g->neighbor_percent = 20;
+        g->remote_percent = 10;
     
         //Environment variables for locality
         if (cilkos_getenv(envstr, sizeof(envstr), "CILK_LOCAL_PERCENT"))
