@@ -825,23 +825,8 @@ static full_frame *unroll_call_stack(__cilkrts_worker *w,
         rev_sf = sf;
         sf = t_sf;
     } while (sf);
-    sf = rev_sf;
-
-    int owner_socket_id = ANY_SOCKET;
-
     // At this point, sf should be the oldest sf in the unrolling stacklet
-    if(sf->flags & CILK_FRAME_WITH_DESIGNATED_SOCKET) {
-        // CILK_ASSERT(sf->flags & CILK_FRAME_LAST);
-        if(sf->size != ANY_SOCKET) { 
-            owner_socket_id = sf->size % w->g->num_sockets;
-            ff->owner_socket_id = owner_socket_id;
-        } else {
-            ff->owner_socket_id = ANY_SOCKET;
-        }
-    } else {
-        owner_socket_id = ff->owner_socket_id; // should have been set already otherwise
-    }
-    // CILK_ASSERT(owner_socket_id != -1);
+    sf = rev_sf;
 
     /* Promote each stack frame to a full frame in order from parent
        to child, following the reversed list we just built. */
@@ -1099,20 +1084,8 @@ static int check_frame_for_sync_master(__cilkrts_worker *w, full_frame *ff) {
         // the frame is if the original user worker is spinning without
         // work.
         __cilkrts_worker *sync_master = ff->sync_master;
-        // ANGE: Can't do it here; or it would be stolen by others
+        // ANGE: Can't unset here; or ff would be stolen by others
         // unset_sync_master(sync_master, ff);
-        // if( w->g->pin_top_level_frame_at_socket != ANY_SOCKET ) {
-            // CILK_ASSERT(w->g->pin_top_level_frame_at_socket == sync_master->l->my_socket_id);
-            __cilkrts_stack_frame *sf = ff->call_stack;
-            if(sf->flags & CILK_FRAME_WITH_DESIGNATED_SOCKET) {
-                ff->owner_socket_id = sf->size % w->g->num_sockets;
-            } else {
-                ff->owner_socket_id = ANY_SOCKET;
-            }
-        /* } else {
-            ff->owner_socket_id = ANY_SOCKET;
-        } */
-
         if(sync_master != w) {
             // transfer_next_frame(w, sync_master);
             push_next_frame(sync_master, ff);
@@ -1120,6 +1093,24 @@ static int check_frame_for_sync_master(__cilkrts_worker *w, full_frame *ff) {
         }
     }
     return 0;
+}
+
+static void update_frame_owner_socket_id(__cilkrts_worker *w, full_frame *ff) {
+
+    // ASSERT_FRAME_LOCK_OWNED(ff);  // not in the case of loot_ff
+    CILK_ASSERT(ff->call_stack != NULL);
+
+    int owner_socket_id = ANY_SOCKET;
+    __cilkrts_stack_frame *sf = ff->call_stack;
+
+    if(sf->flags & CILK_FRAME_WITH_DESIGNATED_SOCKET) {
+        // CILK_ASSERT(sf->flags & CILK_FRAME_LAST);
+        if(sf->size != ANY_SOCKET) {
+            ff->owner_socket_id = sf->size % w->g->num_sockets;
+        } else {
+            ff->owner_socket_id = ANY_SOCKET;
+        }
+    } // in the else case, it should have been set already
 }
 
 /* detach the top of the deque frame from the VICTIM and install a new
@@ -1168,8 +1159,8 @@ static int detach_for_steal(__cilkrts_worker *w,
            frame LOOT.  If loot_ff == parent_ff, then we hold loot_ff->lock,
            otherwise, loot_ff is newly created and we can modify it without
            holding its lock. */
-        // parent's owner_socket_id can change after unroll_call_stack
-        int parent_old_owner_socket_id = parent_ff->owner_socket_id; 
+        // parent still has the old owner_socket_id, which gets inherited by 
+        // everything in the stacklet including the spawned child left on victim
         loot_ff = unroll_call_stack(w, parent_ff, sf);
 
         CILK_ASSERT(loot_ff->call_stack);
@@ -1195,8 +1186,12 @@ static int detach_for_steal(__cilkrts_worker *w,
         // increment join counter on the parent
         // After this "push_next_frame" call, w now owns loot_ff.
         full_frame *child_ff = make_child(w, loot_ff, 0, fiber);
-        // the child inherit parent's old owner socket id before it changes
-        child_ff->owner_socket_id = parent_old_owner_socket_id;
+
+        // Now we update the owner_socket_id of parent_ff and loot_ff
+        update_frame_owner_socket_id(w, parent_ff);
+        if(parent_ff != loot_ff) {
+            loot_ff->owner_socket_id = parent_ff->owner_socket_id;
+        }
 
         BEGIN_WITH_FRAME_LOCK(w, child_ff) {
             /* install child in the victim's work queue, taking
@@ -2771,6 +2766,7 @@ static void do_sync(__cilkrts_worker *w, full_frame *ff,
                 // provably good steal successful; at this point, we have
                 // ownership on frame_ff
                 if(steal_result == CONTINUE_EXECUTION) { 
+                    update_frame_owner_socket_id(w, ff);
                     if( !check_frame_for_sync_master(w, ff) ) {
                         if( !check_frame_for_designated_socket(w, ff) ) {
                             push_next_frame(w, ff);
@@ -3052,6 +3048,7 @@ static void do_return_from_spawn(__cilkrts_worker *w,
             // provably good steal successful; at this point, we have
             // ownership on frame_ff
             if(steal_result == CONTINUE_EXECUTION) {
+                update_frame_owner_socket_id(w, parent_ff);
                 if( !check_frame_for_sync_master(w, parent_ff) ) {
                     if( !check_frame_for_designated_socket(w, parent_ff) ) {
                         push_next_frame(w, parent_ff);
