@@ -3,7 +3,7 @@ libtoolize
 aclocal
 automake --add-missing
 autoconf
-./configure --prefix=`pwd`/.. \
+./configure --prefix=`pwd`/../locality_runtime \
 CC=/usr/local/tapir/build/bin/clang \
 CXX=/usr/local/tapir/build/bin/clang++ \
 CFLAGS='-g -O3 -DSCHED_STATS' CXXFLAGS='-g -O3 -DSCHED_STATS' \
