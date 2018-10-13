@@ -1,3 +1,9 @@
+# NUMA-WS
+
+These are a series of benchmarks to test and demonstrate the capability of the
+NUMA-WS runtime system. Read more [here](https://arxiv.org/abs/1806.11128). You
+can find the companion benchmarks [here](https://gitlab.com/wustl-pctg/numa-ws-benchmarks).
+
 This version of runtime should be used in combination with the WUSTL version
 of the LLVM Cilk Plus comiler in llvm-cilk / clang-cilk.
 
