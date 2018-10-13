@@ -4,33 +4,24 @@ These are a series of benchmarks to test and demonstrate the capability of the
 NUMA-WS runtime system. Read more [here](https://arxiv.org/abs/1806.11128). You
 can find the companion benchmarks [here](https://gitlab.com/wustl-pctg/numa-ws-benchmarks).
 
-This version of runtime should be used in combination with the WUSTL version
-of the LLVM Cilk Plus comiler in llvm-cilk / clang-cilk.
+## Future Changes
+Currently, the NUMA aware runtime calls need to be added to programs *by hand*.
+In the future these runtime calls will be inserted at compile time and new
+syntax will be introduced.
 
-The main difference is that, this runtime implements __cilkrts_detach and 
-has a set of empty functions for the instrumentations used by cilktool.
+## Getting Started
+We recommend using [Tapir](http://cilk.mit.edu/download/) to compile your programs
+to work with this runtime.
 
-If you don't plan to use any of the inlining of runtime code and cilktools, 
-follow the vanilla installation instruction:
+1. Clone this repository to the machine you wish to install it on.
+2. Run one of the reconfigure scrips depending on your use case.
+    1. reconfigure.sh: completely vanilla instalation
+    2. reconfigure_timing.sh: provides runtime statistics
+    3. reconfigure_likwid.sh: provides the ability to use the LIKWID profiler.
+4. make
+5. make install
 
-Vanilla installation:
-==============================================================
-
-Within the src/ dir, configure the runtime as follows:
-(Note that you need to do this once only unless you want to reconfigure the runtime)
-
-% libtoolize
-% aclocal
-% automake --add-missing
-% autoconf
-% ./configure \
-%   --prefix=<where you want to install> \
-%   CC=clang CXX=clang++
-% make  
-% make install
-
-Locality Paramaters added to this runtime
-=========================================
+## Locality Paramaters added to this runtime
 CILK_NUM_SOCKETS is the number of sockets the computation will run on.
 CILK_WORKERS_PER_SOCKET is the number of workers on each socket.
 CILK_LOCAL_PERCENT is the percent chance that the steal will be on the local socket.
@@ -41,120 +32,10 @@ before is stops being pushed back.
 
 ex: CILK_NUM_SOCKETS=1 CILK_WORKERS_PER_SOCKET=8 CILK_NWORKERS=8 ./foo
 
-Augmented runtime functions for locality
-========================================
+## New runtime calls for locality
 __cilkrts_set_pinning_info(int) sets the continuation with a socket to be pushed to.
 __cilkrts_unset_pinning_info() unsets all pinning info for the continuation.
 __cilkrts_disable_nonlocal_steal() only allows for steals from the local socket.
 __cilkrts_enable_nonlocal_steal() allows for steals from outside the local socket.
 __cilkrts_pin_top_level_frame_at_socket() allows for the top level frame to have pinning information.
 
-Support for using __cilkrts_detach implemeneted in the runtime
-==============================================================
-
-When compile the user application with -fno-inline-detach, the compiled code
-invokes __cilkrts_detach instead of inling it.  Thus, the version implemented 
-in the runtime will be invoked.
-
-Note that, you will also need to compile the runtime with additional
--fno-inline-detach flag so that the detach for implementing cilk_for is not
-inlined.
-
-Support for using AND inlining __cilkrts_detach implemeneted in the runtime
-===========================================================================
-
-By using LTO (linked-time optimization), one can get the compiler to also 
-inline the __cilkrts_detach implemented by the runtime.
-
-To allow such inlining, one needs to enable LTO, which requires a few additional steps:
-
-- get GNU gold linker (either via rpm package or install from the new binutils source)
-- configure and comile llvm-cilk with gold linker support 
-  (see README.md for llvm-cilk)
-- if llvm-cilk is configured with gold linker support, you will find 
-  LLVMgold.so in the lib/ directory where llvm-cilk s installed.
-- compile the runtime into LLVM bitcode in the form of a static library, 
-  and link the static library with the user application comiled with 
-  -fno-inline-detach.
-
-To allow such a static library to be compiled, one should configurate the
-runtime as follows:
-
-% libtoolize
-% aclocal
-% automake --add-missing
-% autoconf
-% ./configure \
-%   --prefix=<where you want to install> \
-%   CC=clang CXX=clang++ \
-%   CFLAGS="-flto -fno-inline-detach" \
-%   CXXFLAGS="-flto -fno-inline-detach" \
-%   AR_FLAGS="cru --plugin=<the installation of LLVMgold.so> \
-%   RANLIB=/bin/true
-% make  
-% make install   
-
-Note that the -flto and -fno-inline-detach flags are necessary even when
-compiling the runtime, because there are spawn / sync statements used in the
-runtime to implement cilk_for.
-                     
-The, compile the user app with the following additional flags:
-CFLAGS = -flto -fno-inline-detach
-CXXFLAGS = -flto -fno-inline-detach
-LDFLAGS = -flto
-
-and link with static library libcilkrts.a.
-(Note that dynamic linking won't inline detach.)
-
-If your gold linker is not installed at the usual location, by default the
-non-gold linker may be invoked.  As a result, you may see errors when
-compiling the user application.  To see which version of the linker is invoked, 
-add a "-v" flag when you invoke clang / clang++.  This will output a message 
-indicating the linker used.  Typically it will be /usr/bin/ld instead of where 
-you installed the gold linker.  
-
-To make the build use the gold linker, the easiest work-around is to create a 
-symbolic link /usr/bin/ld to point to the gold linker.  But that means
-everyone else on that system would be using the gold linker (which is not a
-bad thing, since it's supposedly more efficient).  If that's not a desirable
-outcome, however, you could make ld a small shell script that invokes the
-ordinary ld by default, or something else if an environment variable is set. 
-
-
-Support for Cilktools
-=====================
-
-When compile the user application with -fcilktool, a set of instrumentations 
-will be inserted (see cilkplus_rts/runtime/cilktool.h).  By default, the
-runtime implements these instrumentations as empty calls, so as to allow
-linking with user applications compiled with -fcilktool.  
-
-If you are implementing your own version of tool, you would also want to 
-compile the runtime itself with -fcilktool (since the runtime implements
-cilk_for using cilk_spawn / cilk_sync, and those statements need to be
-compiled with instrumentation in order for the tool to work correctly on
-cilk_for.
-
-To add the -fcilktool flag to compilation, simply follow the same 
-instruction above, with addtional CFLAGS in the configure step:
-
-% ./configure \
-%   --prefix=<where you want to install> \
-%   CC=clang CXX=clang++ \
-%   CFLAGS="-flto -fcilktool" \
-%   CXXFLAGS="-flto -fcilktool" \
-%   AR_FLAGS="cru --plugin=<the installation of LLVMgold.so>
-
-(The -flto and AR_FLAGS are necessary to support LTO.)
-Then, link the created static library (libcilkrts.a) with the user app.
-
-
-If you have configured the runtime previously, do
-% make maintainer-clean 
-to remove the Makefile and configuration files from previous install.
-
-Merge with upstream
-===================
-
-Upstream: https://bitbucket.org/intelcilkruntime/intel-cilk-runtime.git
-Last commit merged with upstream: 4bbddb7
