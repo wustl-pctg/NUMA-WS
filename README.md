@@ -22,20 +22,20 @@ to work with this runtime.
 5. make install
 
 ## Locality Paramaters added to this runtime
-CILK_NUM_SOCKETS is the number of sockets the computation will run on.
-CILK_WORKERS_PER_SOCKET is the number of workers on each socket.
-CILK_LOCAL_PERCENT is the percent chance that the steal will be on the local socket.
-CILK_NEIGHBOR_PERCENT is the percent chance that the steal will be on an immediate neighbor.
-CILK_REMOTE_PERCENT is the percent chance that the steal will be on the remote socket.
-CILK_MAX_NONLOCAL_STEAL_ATTEMPTS is the number of times a worker can try to steal a frame
+- CILK_NUM_SOCKETS is the number of sockets the computation will run on.
+- CILK_WORKERS_PER_SOCKET is the number of workers on each socket.
+- CILK_LOCAL_PERCENT is the percent chance that the steal will be on the local socket.
+- CILK_NEIGHBOR_PERCENT is the percent chance that the steal will be on an immediate neighbor.
+- CILK_REMOTE_PERCENT is the percent chance that the steal will be on the remote socket.
+- CILK_MAX_NONLOCAL_STEAL_ATTEMPTS is the number of times a worker can try to steal a frame
 before is stops being pushed back.
 
 ex: CILK_NUM_SOCKETS=1 CILK_WORKERS_PER_SOCKET=8 CILK_NWORKERS=8 ./foo
 
 ## New runtime calls for locality
-__cilkrts_set_pinning_info(int) sets the continuation with a socket to be pushed to.
-__cilkrts_unset_pinning_info() unsets all pinning info for the continuation.
-__cilkrts_disable_nonlocal_steal() only allows for steals from the local socket.
-__cilkrts_enable_nonlocal_steal() allows for steals from outside the local socket.
-__cilkrts_pin_top_level_frame_at_socket() allows for the top level frame to have pinning information.
+- __cilkrts_set_pinning_info(int) sets the continuation with a socket to be pushed to.
+- __cilkrts_unset_pinning_info() unsets all pinning info for the continuation.
+- __cilkrts_disable_nonlocal_steal() only allows for steals from the local socket.
+- __cilkrts_enable_nonlocal_steal() allows for steals from outside the local socket.
+- __cilkrts_pin_top_level_frame_at_socket() allows for the top level frame to have pinning information.
 
