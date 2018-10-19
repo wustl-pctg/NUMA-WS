@@ -2263,7 +2263,9 @@ static full_frame* check_for_work(__cilkrts_worker *w)
             // If we are about to do a random steal, we should have no
             // full frame...
             CILK_ASSERT(NULL == w->l->frame_ff);
-            //LIKWID_MARKER_START("Runtime");
+#ifdef LIKWID_RUNTIME
+            LIKWID_MARKER_START("Runtime");
+#endif
             START_TIMING(w, INTERVAL_IDLE);
             START_TIMING(w, INTERVAL_SCHED); 
             random_steal(w);
@@ -2293,7 +2295,9 @@ static full_frame* check_for_work(__cilkrts_worker *w)
                 || ff->failed_nonlocal_steals >= w->g->max_nonlocal_steal_attempts);
         }
     }
-    //LIKWID_MARKER_START("Runtime");
+#ifdef LIKWID_RUNTIME
+    LIKWID_MARKER_START("Runtime");
+#endif
     START_TIMING(w, INTERVAL_SCHED);
 
     return ff;
@@ -2620,7 +2624,9 @@ static void worker_scheduler_function(__cilkrts_worker *w)
             STOP_TIMING(w, INTERVAL_SCHED);
             STOP_INTERVAL(w, INTERVAL_IN_RUNTIME);
             START_INTERVAL(w, INTERVAL_WORKING);
+#ifndef LIKWID_RUNTIME
             LIKWID_MARKER_START("UserCode");
+#endif
             START_TIMING(w, INTERVAL_WORK_INFLATION);
             cilk_fiber_suspend_self_and_resume_other(w->l->scheduling_fiber,
                                                      fiber_to_resume);
@@ -2820,7 +2826,9 @@ NORETURN __cilkrts_c_sync(__cilkrts_worker *w,
     STOP_TIMING(w, INTERVAL_WORK_INFLATION); 
     STOP_INTERVAL(w, INTERVAL_WORKING);
     START_INTERVAL(w, INTERVAL_IN_RUNTIME);
-    //LIKWID_MARKER_START("Runtime");
+#ifdef LIKWID_RUNTIME
+    LIKWID_MARKER_START("Runtime");
+#endif
     START_TIMING(w, INTERVAL_SCHED);
 
     // Claim: This read of w->l->frame_ff can occur without
@@ -2912,7 +2920,9 @@ void __cilkrts_c_THE_exception_check(__cilkrts_worker *w,
     STOP_TIMING(w, INTERVAL_WORK_INFLATION);
     STOP_INTERVAL(w, INTERVAL_WORKING);
     START_INTERVAL(w, INTERVAL_IN_RUNTIME);
-    //LIKWID_MARKER_START("Runtime");
+#ifdef LIKWID_RUNTIME
+    LIKWID_MARKER_START("Runtime");
+#endif
     START_TIMING(w, INTERVAL_SCHED);
 
     START_INTERVAL(w, INTERVAL_THE_EXCEPTION_CHECK);
@@ -2989,7 +2999,9 @@ void __cilkrts_c_THE_exception_check(__cilkrts_worker *w,
         STOP_TIMING(w, INTERVAL_SCHED);
         STOP_INTERVAL(w, INTERVAL_IN_RUNTIME);
         START_INTERVAL(w, INTERVAL_WORKING);
+#ifndef LIKWID_RUNTIME
         LIKWID_MARKER_START("UserCode");
+#endif
         START_TIMING(w, INTERVAL_WORK_INFLATION);
         return;
     }
@@ -3004,7 +3016,9 @@ NORETURN __cilkrts_exception_from_spawn(__cilkrts_worker *w,
     STOP_TIMING(w, INTERVAL_WORK_INFLATION);
     STOP_INTERVAL(w, INTERVAL_WORKING);
     START_INTERVAL(w, INTERVAL_IN_RUNTIME);
-    //LIKWID_MARKER_START("Runtime");
+#ifdef LIKWID_RUNTIME
+    LIKWID_MARKER_START("Runtime");
+#endif
     START_TIMING(w, INTERVAL_SCHED);
 
     // This is almost the same as THE_exception_check, except
@@ -3161,7 +3175,9 @@ void __cilkrts_return(__cilkrts_worker *w)
     STOP_INTERVAL(w, INTERVAL_WORKING);
     START_INTERVAL(w, INTERVAL_IN_RUNTIME);
     START_INTERVAL(w, INTERVAL_RETURNING);
-    //LIKWID_MARKER_START("Runtime");
+#ifdef LIKWID_RUNTIME
+    LIKWID_MARKER_START("Runtime");
+#endif
     START_TIMING(w, INTERVAL_SCHED);
 
     BEGIN_WITH_WORKER_LOCK_OPTIONAL(w) {
@@ -3229,7 +3245,9 @@ void __cilkrts_return(__cilkrts_worker *w)
     STOP_INTERVAL(w, INTERVAL_RETURNING);
     STOP_INTERVAL(w, INTERVAL_IN_RUNTIME);
     START_INTERVAL(w, INTERVAL_WORKING);
+#ifndef LIKWID_RUNTIME
     LIKWID_MARKER_START("UserCode");
+#endif
     START_TIMING(w, INTERVAL_WORK_INFLATION);
 }
 
@@ -3292,7 +3310,9 @@ void __cilkrts_c_return_from_initial(__cilkrts_worker *w)
     STOP_TIMING(w, INTERVAL_WORK_INFLATION);
     STOP_INTERVAL(w, INTERVAL_WORKING);
     START_INTERVAL(w, INTERVAL_IN_RUNTIME);
-    //LIKWID_MARKER_START("Runtime");
+#ifdef LIKWID_RUNTIME
+    LIKWID_MARKER_START("Runtime");
+#endif
     START_TIMING(w, INTERVAL_SCHED);
 
     /* This is only called on a user thread worker. */
@@ -4300,7 +4320,9 @@ slow_path_reductions_for_spawn_return(__cilkrts_worker *w,
             STOP_TIMING(w, INTERVAL_SCHED);
             STOP_INTERVAL(w, INTERVAL_IN_RUNTIME);
             START_INTERVAL(w, INTERVAL_WORKING);
+#ifndef LIKWID_RUNTIME
             LIKWID_MARKER_START("UserCode");
+#endif
             START_TIMING(w, INTERVAL_WORK_INFLATION);
 
             // Merge all reducers into the left map.
@@ -4327,7 +4349,9 @@ slow_path_reductions_for_spawn_return(__cilkrts_worker *w,
             STOP_TIMING(w, INTERVAL_WORK_INFLATION);
             STOP_INTERVAL(w, INTERVAL_WORKING);
             START_INTERVAL(w, INTERVAL_IN_RUNTIME);
-            //LIKWID_MARKER_START("Runtime");
+#ifdef LIKWID_RUNTIME
+            LIKWID_MARKER_START("Runtime");
+#endif
             START_TIMING(w, INTERVAL_SCHED);
 
             // Lock ff->parent for the next loop around.
@@ -4497,7 +4521,9 @@ slow_path_reductions_for_sync(__cilkrts_worker *w,
         STOP_TIMING(w, INTERVAL_SCHED);
         STOP_INTERVAL(w, INTERVAL_IN_RUNTIME);
         START_INTERVAL(w, INTERVAL_WORKING);
+#ifndef LIKWID_RUNTIME
         LIKWID_MARKER_START("UserCode");
+#endif
         START_TIMING(w, INTERVAL_WORK_INFLATION);
 
         // If we get here, we have a nontrivial reduction to execute.
@@ -4510,7 +4536,9 @@ slow_path_reductions_for_sync(__cilkrts_worker *w,
         STOP_TIMING(w, INTERVAL_WORK_INFLATION);
         STOP_INTERVAL(w, INTERVAL_WORKING);
         START_INTERVAL(w, INTERVAL_IN_RUNTIME);
-        //LIKWID_MARKER_START("Runtime");
+#ifdef LIKWID_RUNTIME
+        LIKWID_MARKER_START("Runtime");
+#endif
         START_TIMING(w, INTERVAL_SCHED);
 
         // Save any exceptions generated because of the reduction
