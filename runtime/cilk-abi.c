@@ -583,7 +583,9 @@ CILK_ABI_WORKER_PTR BIND_THREAD_RTN(void)
     /* We are about to switch back into user code after binding the
        thread.  Start working again. */
     STOP_TIMING(w, INTERVAL_SCHED);
-    //LIKWID_MARKER_STOP("Runtime");
+#ifdef LIKWID_RUNTIME
+    LIKWID_MARKER_STOP("Runtime");
+#endif
     STOP_INTERVAL(w, INTERVAL_IN_RUNTIME);
     START_INTERVAL(w, INTERVAL_WORKING);
 #ifdef SCHED_STATS

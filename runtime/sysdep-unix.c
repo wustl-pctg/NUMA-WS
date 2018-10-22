@@ -224,7 +224,9 @@ NON_COMMON void* scheduler_thread_proc_for_system_worker(void *arg)
     } STOP_INTERVAL(w, INTERVAL_FIBER_DEALLOCATE_FROM_THREAD);
 
     STOP_TIMING(w, INTERVAL_SCHED);
-    //LIKWID_MARKER_STOP("Runtime");
+#ifdef LIKWID_RUNTIME
+    LIKWID_MARKER_STOP("Runtime");
+#endif
     STOP_INTERVAL(w, INTERVAL_IN_RUNTIME);
     STOP_INTERVAL(w, INTERVAL_IN_SCHEDULER);
     return 0;
