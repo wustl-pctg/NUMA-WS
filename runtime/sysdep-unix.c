@@ -175,7 +175,11 @@ NON_COMMON void* scheduler_thread_proc_for_system_worker(void *arg)
     /*int status;*/
     __cilkrts_worker *w = (__cilkrts_worker *)arg;
 
-    LIKWID_MARKER_THREADINIT;
+    /* According to the Likwid cilk example in their repo
+     * this is not needed. Leaving it in as a comment 
+     * just in case.
+     */
+    //LIKWID_MARKER_THREADINIT;
 
 #ifdef __INTEL_COMPILER
 #ifdef USE_ITTNOTIFY
@@ -293,9 +297,13 @@ void __cilkrts_start_workers(global_state_t *g, int n)
 
     if (!g->sysdep->threads)
         return;
-
+    
+    /* Accrding to the Likwid cilk example
+     * this is the only init that we need to
+     * include.
+     */
     LIKWID_MARKER_INIT;
-    LIKWID_MARKER_THREADINIT;
+    
     // Do we actually have any threads to create?
     if (n > 0) {
         // Simply create all the threads linearly here.

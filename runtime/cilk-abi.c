@@ -485,6 +485,9 @@ CILK_ABI_WORKER_PTR BIND_THREAD_RTN(void)
      * 2: Choose a worker for this thread (fail if none left).  The table of
      *    user workers is protected by the global OS mutex lock.
      */
+#ifdef LIKWID_RUNTIME
+    LIKWID_MARKER_START("Runtime"); 
+#endif
     g = cilkg_get_global_state();
     global_os_mutex_lock();
     if (__builtin_expect(g->work_done, 0))
@@ -503,9 +506,6 @@ CILK_ABI_WORKER_PTR BIND_THREAD_RTN(void)
 
     START_INTERVAL(w, INTERVAL_IN_SCHEDULER);
     START_INTERVAL(w, INTERVAL_IN_RUNTIME);
-#ifdef LIKWID_RUNTIME
-    LIKWID_MARKER_START("Runtime"); 
-#endif
     START_TIMING(w, INTERVAL_SCHED);
     {
         full_frame *ff = __cilkrts_make_full_frame(w, 0);
@@ -593,10 +593,10 @@ CILK_ABI_WORKER_PTR BIND_THREAD_RTN(void)
     //w->l->end = 0;
     //w->l->begin = bCycleCount(); 
 #endif
-    START_TIMING(w, INTERVAL_WORK_INFLATION);
 #ifndef LIKWID_RUNTIME
     LIKWID_MARKER_START("UserCode");
-#endif
+#endif 
+    START_TIMING(w, INTERVAL_WORK_INFLATION);
     ITT_SYNC_RELEASING(&unique_obj);
 
     /* Turn on Cilkscreen if this is the first worker.  This needs to be done

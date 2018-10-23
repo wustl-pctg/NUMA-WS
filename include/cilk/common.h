@@ -98,6 +98,9 @@ namespace cilk {
 #define LIKWID_MARKER_GET(regionTag, nevents, events, time, count)
 #endif
 
+/* Defines for where likwid will collect info from */
+#define LIKWID_RUNTIME
+
 #ifdef __cplusplus
 #   include <cassert>
 #else

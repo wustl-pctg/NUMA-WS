@@ -2254,10 +2254,11 @@ static full_frame* check_for_work(__cilkrts_worker *w)
 {
     full_frame *ff = NULL;
     ff = pop_next_frame(w);
+
+    STOP_TIMING(w, INTERVAL_SCHED);
 #ifdef LIKWID_RUNTIME
     LIKWID_MARKER_STOP("Runtime");
 #endif
-    STOP_TIMING(w, INTERVAL_SCHED);
     // If there is no work on the queue, try to steal some.
     if (NULL == ff) {
         START_INTERVAL(w, INTERVAL_STEALING) {
@@ -2279,6 +2280,9 @@ static full_frame* check_for_work(__cilkrts_worker *w)
         if (NULL == ff) {
             STOP_TIMING(w, INTERVAL_IDLE);
             DROP_TIMING(w, INTERVAL_SCHED);
+#ifdef LIKWID_RUNTIME
+            LIKWID_MARKER_STOP("Runtime");
+#endif 
             // Punish the worker for failing to steal.
             // No quantum for you!
             START_TIMING(w, INTERVAL_IDLE);
@@ -2327,6 +2331,9 @@ static full_frame* search_until_work_found_or_done(__cilkrts_worker *w)
             break;
         case SCHEDULE_WAIT:            // go into wait-mode.
             STOP_TIMING(w, INTERVAL_SCHED);
+#ifdef LIKWID_RUNTIME
+            LIKWID_MARKER_STOP("Runtime");
+#endif
             START_INTERVAL(w, INTERVAL_SCHEDULE_WAIT);
             CILK_ASSERT(WORKER_SYSTEM == w->l->type);
             // If we are about to wait, then we better not have
@@ -2339,6 +2346,9 @@ static full_frame* search_until_work_found_or_done(__cilkrts_worker *w)
             notify_children_run(w);
             w->l->steal_failure_count = 0;
             STOP_INTERVAL(w, INTERVAL_SCHEDULE_WAIT);
+#ifdef LIKWID_RUNTIME
+            LIKWID_MARKER_START("Runtime");
+#endif
             START_TIMING(w, INTERVAL_SCHED);
             break;
         case SCHEDULE_EXIT:            // exit the scheduler.
@@ -2624,10 +2634,11 @@ static void worker_scheduler_function(__cilkrts_worker *w)
 
             // Whenever we jump to resume user code, we stop being in
             // the runtime, and start working.
+
+            STOP_TIMING(w, INTERVAL_SCHED);
 #ifdef LIKWID_RUNTIME
             LIKWID_MARKER_STOP("Runtime");
 #endif
-            STOP_TIMING(w, INTERVAL_SCHED);
             STOP_INTERVAL(w, INTERVAL_IN_RUNTIME);
             START_INTERVAL(w, INTERVAL_WORKING);
 #ifndef LIKWID_RUNTIME
@@ -2828,10 +2839,11 @@ NORETURN __cilkrts_c_sync(__cilkrts_worker *w,
                           __cilkrts_stack_frame *sf_at_sync)
 {
     full_frame *ff;
+
+    STOP_TIMING(w, INTERVAL_WORK_INFLATION); 
 #ifndef LIKWID_RUNTIME
     LIKWID_MARKER_STOP("UserCode");
 #endif
-    STOP_TIMING(w, INTERVAL_WORK_INFLATION); 
     STOP_INTERVAL(w, INTERVAL_WORKING);
     START_INTERVAL(w, INTERVAL_IN_RUNTIME);
 #ifdef LIKWID_RUNTIME
@@ -2924,10 +2936,11 @@ void __cilkrts_c_THE_exception_check(__cilkrts_worker *w,
 
     // For the exception check, stop working and count as time in
     // runtime.
+
+    STOP_TIMING(w, INTERVAL_WORK_INFLATION);
 #ifndef LIKWID_RUNTIME
     LIKWID_MARKER_STOP("UserCode");
 #endif
-    STOP_TIMING(w, INTERVAL_WORK_INFLATION);
     STOP_INTERVAL(w, INTERVAL_WORKING);
     START_INTERVAL(w, INTERVAL_IN_RUNTIME);
 #ifdef LIKWID_RUNTIME
@@ -3005,10 +3018,11 @@ void __cilkrts_c_THE_exception_check(__cilkrts_worker *w,
 
         // If we fail the exception check and return, then switch back
         // to working.
+
+        STOP_TIMING(w, INTERVAL_SCHED);
 #ifdef LIKWID_RUNTIME
         LIKWID_MARKER_STOP("Runtime");
 #endif
-        STOP_TIMING(w, INTERVAL_SCHED);
         STOP_INTERVAL(w, INTERVAL_IN_RUNTIME);
         START_INTERVAL(w, INTERVAL_WORKING);
 #ifndef LIKWID_RUNTIME
@@ -3024,10 +3038,11 @@ NORETURN __cilkrts_exception_from_spawn(__cilkrts_worker *w,
                                         __cilkrts_stack_frame *returning_sf)
 {
     full_frame *ff = w->l->frame_ff;
+
+    STOP_TIMING(w, INTERVAL_WORK_INFLATION);
 #ifndef LIKWID_RUNTIME
     LIKWID_MARKER_STOP("UserCode");
 #endif
-    STOP_TIMING(w, INTERVAL_WORK_INFLATION);
     STOP_INTERVAL(w, INTERVAL_WORKING);
     START_INTERVAL(w, INTERVAL_IN_RUNTIME);
 #ifdef LIKWID_RUNTIME
@@ -3184,10 +3199,11 @@ void __cilkrts_return(__cilkrts_worker *w)
     full_frame *ff, *parent_ff;
 
     // Count time during the return as in the runtime.
+
+    STOP_TIMING(w, INTERVAL_WORK_INFLATION);
 #ifndef LIKWID_RUNTIME
     LIKWID_MARKER_STOP("UserCode");
 #endif
-    STOP_TIMING(w, INTERVAL_WORK_INFLATION);
     STOP_INTERVAL(w, INTERVAL_WORKING);
     START_INTERVAL(w, INTERVAL_IN_RUNTIME);
     START_INTERVAL(w, INTERVAL_RETURNING);
@@ -3256,10 +3272,10 @@ void __cilkrts_return(__cilkrts_worker *w)
         } END_WITH_FRAME_LOCK(w, parent_ff);
     } END_WITH_WORKER_LOCK_OPTIONAL(w);
 
+    STOP_TIMING(w, INTERVAL_SCHED);
 #ifdef LIKWID_RUNTIME
     LIKWID_MARKER_STOP("Runtime");
 #endif
-    STOP_TIMING(w, INTERVAL_SCHED);
     STOP_INTERVAL(w, INTERVAL_RETURNING);
     STOP_INTERVAL(w, INTERVAL_IN_RUNTIME);
     START_INTERVAL(w, INTERVAL_WORKING);
@@ -3274,6 +3290,7 @@ static void __cilkrts_unbind_thread()
     int stop_cilkscreen = 0;
     global_state_t *g;
 
+
     // Take out the global OS mutex to protect accesses to the table of workers
     global_os_mutex_lock();
 
@@ -3282,16 +3299,15 @@ static void __cilkrts_unbind_thread()
         if (w) {
             g = w->g;
 
+            STOP_TIMING(w, INTERVAL_SCHED);
 #ifdef LIKWID_RUNTIME
             LIKWID_MARKER_STOP("Runtime");
 #endif
-            STOP_TIMING(w, INTERVAL_SCHED);
 
             // Matches the START in bind_thread in cilk-abi.c.
             STOP_INTERVAL(w, INTERVAL_IN_RUNTIME);
             STOP_INTERVAL(w, INTERVAL_IN_SCHEDULER);
 
-            LIKWID_MARKER_CLOSE;
 
             __cilkrts_set_tls_worker(0);
 
@@ -3312,6 +3328,7 @@ static void __cilkrts_unbind_thread()
     }
     global_os_mutex_unlock();
 
+    LIKWID_MARKER_CLOSE;
     /* Turn off Cilkscreen.  This needs to be done when we are NOT holding the
      * os mutex. */
     if (stop_cilkscreen)
@@ -3326,10 +3343,11 @@ void __cilkrts_c_return_from_initial(__cilkrts_worker *w)
 
     // When we are returning from the initial frame, switch from
     // INTERVAL_WORKING into INTERVAL_IN_RUNTIME.
+
+    STOP_TIMING(w, INTERVAL_WORK_INFLATION);
 #ifndef LIKWID_RUNTIME
     LIKWID_MARKER_STOP("UserCode");
 #endif
-    STOP_TIMING(w, INTERVAL_WORK_INFLATION);
     STOP_INTERVAL(w, INTERVAL_WORKING);
     START_INTERVAL(w, INTERVAL_IN_RUNTIME);
 #ifdef LIKWID_RUNTIME
@@ -4338,10 +4356,11 @@ slow_path_reductions_for_spawn_return(__cilkrts_worker *w,
 
             // After we've released the lock, start counting time as
             // WORKING again.
+
+            STOP_TIMING(w, INTERVAL_SCHED);
 #ifdef LIKWID_RUNTIME
             LIKWID_MARKER_STOP("Runtime");
-#ifndef
-            STOP_TIMING(w, INTERVAL_SCHED);
+#endif
             STOP_INTERVAL(w, INTERVAL_IN_RUNTIME);
             START_INTERVAL(w, INTERVAL_WORKING);
 #ifndef LIKWID_RUNTIME
@@ -4369,10 +4388,10 @@ slow_path_reductions_for_spawn_return(__cilkrts_worker *w,
             ff->pending_exception = w->l->pending_exception;
             w->l->pending_exception = NULL;
 
+            STOP_TIMING(w, INTERVAL_WORK_INFLATION);
 #ifndef LIKWID_RUNTIME
             LIKWID_MARKER_STOP("UserCode");
 #endif
-            STOP_TIMING(w, INTERVAL_WORK_INFLATION);
             STOP_INTERVAL(w, INTERVAL_WORKING);
             START_INTERVAL(w, INTERVAL_IN_RUNTIME);
 #ifdef LIKWID_RUNTIME
@@ -4543,10 +4562,11 @@ slow_path_reductions_for_sync(__cilkrts_worker *w,
 
         // After we've released the lock, start counting time as
         // WORKING again.
+
+        STOP_TIMING(w, INTERVAL_SCHED);
 #ifdef LIKWID_RUNTIME
         LIKWID_MARKER_STOP("Runtime");
 #endif
-        STOP_TIMING(w, INTERVAL_SCHED);
         STOP_INTERVAL(w, INTERVAL_IN_RUNTIME);
         START_INTERVAL(w, INTERVAL_WORKING);
 #ifndef LIKWID_RUNTIME
@@ -4560,10 +4580,10 @@ slow_path_reductions_for_sync(__cilkrts_worker *w,
                                                  middle_map);
         verify_current_wkr(w);
 
+        STOP_TIMING(w, INTERVAL_WORK_INFLATION);
 #ifndef LIKWID_RUNTIME
         LIKWID_MARKER_STOP("UserCode");
 #endif
-        STOP_TIMING(w, INTERVAL_WORK_INFLATION);
         STOP_INTERVAL(w, INTERVAL_WORKING);
         START_INTERVAL(w, INTERVAL_IN_RUNTIME);
 #ifdef LIKWID_RUNTIME
