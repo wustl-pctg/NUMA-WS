@@ -6,5 +6,6 @@ autoconf
 ./configure --prefix=`pwd`/../locality_runtime \
 CC=/usr/local/tapir/build/bin/clang \
 CXX=/usr/local/tapir/build/bin/clang++ \
-CFLAGS='-g -O3 -DSCHED_STATS' CXXFLAGS='-g -O3 -DSCHED_STATS' \
-LIBS="-lpthread -lrt -lm -ldl"
+CFLAGS='-O3 -DSCHED_STATS' \
+CXXFLAGS='-O3 -DSCHED_STATS' \
+LIBS='-lpthread -lrt -lm -ldl'
