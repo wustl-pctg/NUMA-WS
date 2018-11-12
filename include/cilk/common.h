@@ -94,12 +94,13 @@ namespace cilk {
 #define LIKWID_MARKER_REGISTER(regionTag)
 #define LIKWID_MARKER_START(regionTag)
 #define LIKWID_MARKER_STOP(regionTag)
+#define LIKWID_MARKER_RESET(regionTag)
 #define LIKWID_MARKER_CLOSE
 #define LIKWID_MARKER_GET(regionTag, nevents, events, time, count)
 #endif
 
 /* Defines for where likwid will collect info from */
-#define LIKWID_RUNTIME
+//#define LIKWID_RUNTIME
 
 #ifdef __cplusplus
 #   include <cassert>
