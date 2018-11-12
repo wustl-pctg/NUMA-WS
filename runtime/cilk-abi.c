@@ -486,7 +486,7 @@ CILK_ABI_WORKER_PTR BIND_THREAD_RTN(void)
      *    user workers is protected by the global OS mutex lock.
      */
 #ifdef LIKWID_RUNTIME
-    LIKWID_MARKER_START("Runtime"); 
+    LIKWID_MARKER_START("Runtime");
 #endif
     g = cilkg_get_global_state();
     global_os_mutex_lock();
@@ -497,7 +497,7 @@ CILK_ABI_WORKER_PTR BIND_THREAD_RTN(void)
     int initial_socket = g->pin_top_level_frame_at_socket;
     CILK_ASSERT(w);
     CILK_ASSERT(w->self == 0);
-    CILK_ASSERT(initial_socket == ANY_SOCKET 
+    CILK_ASSERT(initial_socket == ANY_SOCKET
         || w->l->my_socket_id == initial_socket);
 
     __cilkrts_set_tls_worker(w);
@@ -591,11 +591,11 @@ CILK_ABI_WORKER_PTR BIND_THREAD_RTN(void)
 #ifdef SCHED_STATS
     //CILK_ASSERT(w->l->begin == 0);
     //w->l->end = 0;
-    //w->l->begin = bCycleCount(); 
+    //w->l->begin = bCycleCount();
 #endif
 #ifndef LIKWID_RUNTIME
     LIKWID_MARKER_START("UserCode");
-#endif 
+#endif
     START_TIMING(w, INTERVAL_WORK_INFLATION);
     ITT_SYNC_RELEASING(&unique_obj);
 
@@ -842,6 +842,7 @@ CILK_ABI_VOID __cilkrts_set_pinning_info(int32_t socket_id) {
     sf->size = socket_id;
 }
 
+
 CILK_ABI_VOID __cilkrts_unset_pinning_info() {
     __cilkrts_worker *w = __cilkrts_get_tls_worker();
     CILK_ASSERT(w != NULL);
@@ -871,6 +872,12 @@ CILK_API_INT __cilkrts_num_sockets() {
     global_state_t *g = cilkg_get_global_state();
     CILK_ASSERT(g != NULL);
     return g->num_sockets;
+}
+
+CILK_API_INT __cilkrts_get_owner_socket() {
+    __cilkrts_worker *w = __cilkrts_get_tls_worker();
+    int socket_id = w->l->frame_ff->owner_socket_id;
+    return socket_id;
 }
 
 CILK_API_INT

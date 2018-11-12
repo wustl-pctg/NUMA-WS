@@ -106,6 +106,7 @@ CILKABI1
     __cilkrts_set_pinning_info;
     __cilkrts_unset_pinning_info;
     __cilkrts_num_sockets;
+    __cilkrts_get_owner_socket;
     __cilkrts_enter_frame_1;
     __cilkrts_enter_frame_fast_1;
     __cilkrts_get_pedigree_info;

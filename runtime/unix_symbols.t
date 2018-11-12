@@ -43,6 +43,7 @@ __cilkrts_enable_nonlocal_steal
 __cilkrts_pin_top_level_frame_at_socket
 __cilkrts_set_pinning_info
 __cilkrts_unset_pinning_info
+__cilkrts_get_owner_socket
 __cilkrts_num_sockets
 __cilkrts_cilk_for_32
 __cilkrts_cilk_for_64

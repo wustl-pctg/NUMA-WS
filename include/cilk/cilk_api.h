@@ -264,6 +264,7 @@ CILK_API(void) __cilkrts_unset_pinning_info();
 CILK_API(void) __cilkrts_disable_nonlocal_steal();
 CILK_API(void) __cilkrts_enable_nonlocal_steal();
 CILK_API(int) __cilkrts_num_sockets();
+CILK_API(int) __cilkrts_get_owner_socket();
 
 /* Pedigree API is available only for compilers that use ABI version >= 1. */
 
