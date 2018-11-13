@@ -176,10 +176,10 @@ NON_COMMON void* scheduler_thread_proc_for_system_worker(void *arg)
     __cilkrts_worker *w = (__cilkrts_worker *)arg;
 
     /* According to the Likwid cilk example in their repo
-     * this is not needed. Leaving it in as a comment 
+     * this is not needed. Leaving it in as a comment
      * just in case.
      */
-    //LIKWID_MARKER_THREADINIT;
+    LIKWID_MARKER_THREADINIT;
 
 #ifdef __INTEL_COMPILER
 #ifdef USE_ITTNOTIFY
@@ -297,19 +297,19 @@ void __cilkrts_start_workers(global_state_t *g, int n)
 
     if (!g->sysdep->threads)
         return;
-    
+
     /* Accrding to the Likwid cilk example
      * this is the only init that we need to
      * include.
      */
     LIKWID_MARKER_INIT;
-    
+
     // Do we actually have any threads to create?
     if (n > 0) {
         // Simply create all the threads linearly here.
         create_threads(g, 1, n+1); // worker 0 is reserved as user worker
     }
-    
+
     //First pin the user thread to core 0
     cpu_set_t mask;
     CPU_ZERO(&mask);
@@ -331,8 +331,8 @@ void __cilkrts_start_workers(global_state_t *g, int n)
         CPU_ZERO(&mask);
         CPU_SET(j + cpu_offset, &mask);
         int ret_val = pthread_setaffinity_np(g->sysdep->threads[j], sizeof(mask), &mask);
-        CILK_ASSERT(ret_val == 0); 
-   }  
+        CILK_ASSERT(ret_val == 0);
+   }
 
     // write the version information to a file if the environment is configured
     // for it (the function makes the check).

@@ -45,7 +45,7 @@ void __cilkrts_init_sched_stats(stats *s)
         s->begin[i] = 0;
         s->end[i] = 0;
         s->time[i] = 0;
-        s->last_user_code_op = INTERVAL_WORK_UNPINNED; // default 
+        s->last_user_code_op = INTERVAL_WORK_UNPINNED; // default
         s->total_steals = 0;
         s->successful_steals = 0;
         s->successful_steals_pushed = 0;
@@ -85,7 +85,7 @@ void __cilkrts_stop_timing(__cilkrts_worker *w, enum timing i)
                 s->time[s->last_user_code_op] += elapsed;
             }
         }
-        s->begin[i] = 0; 
+        s->begin[i] = 0;
     }
 }
 
@@ -105,7 +105,7 @@ void __cilkrts_accum_timing()
 #ifndef EXTEND_INSTRUMENT
     for(int i = 0; i < NUMBER_OF_STATS; ++i) {
         for(int j = 0; j < g->total_workers; ++j) {
-            double increment = 
+            double increment =
                 cycleToMicroSecond(g->workers[j]->l->sched_stats->time[i]);
             g->sched_stats->time[i] += increment;
             g->workers[j]->l->sched_stats->time[i] = 0;
@@ -119,31 +119,31 @@ void __cilkrts_accum_timing()
             g->sched_stats->time[i] += increment;
         }
         printf("Worker %2d=> Scheduling: %2.3f, Working: %2.3f (%2.3f(l)/%2.3f(r)/%2.3f(u)), Idle %2.3f, steals: %u(p)/%u(s)/%u\n",
-               j, 
+               j,
                cycleToSecond(wstats->time[INTERVAL_SCHED]),
                cycleToSecond(wstats->time[INTERVAL_WORK_INFLATION]),
                cycleToSecond(wstats->time[INTERVAL_WORK_LOCAL]),
                cycleToSecond(wstats->time[INTERVAL_WORK_REMOTE]),
                cycleToSecond(wstats->time[INTERVAL_WORK_UNPINNED]),
-               cycleToSecond(wstats->time[INTERVAL_IDLE]), 
-               wstats->successful_steals_pushed, 
-               wstats->successful_steals, 
+               cycleToSecond(wstats->time[INTERVAL_IDLE]),
+               wstats->successful_steals_pushed,
+               wstats->successful_steals,
                wstats->total_steals);
     }
 #endif
 
-    fprintf(stdout, "Total Scheduling Time: %f\n", 
+    fprintf(stdout, "Total Scheduling Time: %f\n",
             MicroSecondToSecond(g->sched_stats->time[INTERVAL_SCHED]));
-    fprintf(stdout, "Total Working Time: %f (%f(l)/%f(r)/%f(u))\n", 
+    fprintf(stdout, "Total Working Time: %f (%f(l)/%f(r)/%f(u))\n",
             MicroSecondToSecond(g->sched_stats->time[INTERVAL_WORK_INFLATION]),
             MicroSecondToSecond(g->sched_stats->time[INTERVAL_WORK_LOCAL]),
             MicroSecondToSecond(g->sched_stats->time[INTERVAL_WORK_REMOTE]),
             MicroSecondToSecond(g->sched_stats->time[INTERVAL_WORK_UNPINNED]));
-    fprintf(stdout, "Total Idle Time: %f\n", 
+    fprintf(stdout, "Total Idle Time: %f\n",
             MicroSecondToSecond(g->sched_stats->time[INTERVAL_IDLE]));
 }
 
-void __cilkrts_reset_timing() 
+void __cilkrts_reset_timing()
 {
     global_state_t *g = cilkg_get_global_state();
     for(int i = 0; i < NUMBER_OF_STATS; ++i) {
@@ -157,8 +157,7 @@ void __cilkrts_reset_timing()
 
     }
 
-    LIKWID_MARKER_CLOSE;
-    LIKWID_MARKER_INIT;
+    LIKWID_MARKER_RESET("UserCode")
 }
 
 #else
