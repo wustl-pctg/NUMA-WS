@@ -1353,46 +1353,66 @@ static int try_steal_victim_next_frame_ff(__cilkrts_worker *w,
 
     CILK_ASSERT(!(ready_ff->sync_master && __cilkrts_check_synched(ready_ff)));
 
+    //if the ready_ff doesn't have an owner socket, feel free to take it
     if (ready_ff->owner_socket_id == ANY_SOCKET) { goto take_frame; }
 
+    //if the ready_ff's owner socket and the victim's socket id do not match
+    //we should attempt to move the ready_ff to the correct socket. This can happen
+    //in situations where the ready_ff ends up in the next_frame_ff field from
+    //mechanisms other than pushing
     if (ready_ff->owner_socket_id != victim->l->my_socket_id) {
         // victim has work to do; push this frame to the right socket
         // possibly myself if I am on the right socket
+
+        //if the theif's socket id matches the ready_ff's owner socket, feel free to take it
         if(ready_ff->owner_socket_id == w->l->my_socket_id) {
             goto take_frame;
-        } else {
-            // transfer_next_frame(victim, w_to_push, ready_ff);
-            int steals = 0;
-            while(steals < w->g->max_nonlocal_steal_attempts) {
+        } else { //if the theif's socket doesn't match, try to push the ready_ff to the correct socket
+            int tries = 0;
+            while(tries < w->g->max_nonlocal_steal_attempts) {
                 __cilkrts_worker *w_to_push =
                     pick_random_worker_on_socket(w, ready_ff->owner_socket_id);
-                if (w_to_push->l->next_frame_ff) {
-                    steals++;
+                if (w_to_push->l->next_frame_ff) { //if the mailbox is full, try again
+                    tries++;
                     continue;
                 } else {
+                  BEGIN_WITH_FRAME_LOCK(w, ready_ff) {
+                      printf("tries: %d\n", tries);
+                      //record how many tries it took to push the ready_ff
+                      ready_ff->failed_nonlocal_steals += tries;
+                  } END_WITH_FRAME_LOCK(w, ready_ff);
                     transfer_next_frame(victim, w_to_push, ready_ff);
                     return 0; // failed to steal in this case
                 }
             }
             BEGIN_WITH_FRAME_LOCK(w, ready_ff) {
-                ready_ff->failed_nonlocal_steals += steals;
+                printf("tries: %d\n", tries);
+                //record that the push threshold has been reached
+                ready_ff->failed_nonlocal_steals += tries;
             } END_WITH_FRAME_LOCK(w, ready_ff);
             goto take_frame;
         }
+    //if the theif and the victim are on the same socket and the ready_ff is on
+    //the correct socket, feel free to take it
     } else if (victim->l->my_socket_id == w->l->my_socket_id) {
         goto take_frame;
+
+    //the theif from a forign socket is attempting to steal from a mailbox
+    //where the ready_ff belongs on that socket
     } else {
         int steals = 0;
-        if (ready_ff->owner_socket_id == victim->l->my_socket_id) {
+        if (ready_ff->owner_socket_id == victim->l->my_socket_id) { //XXX: possibly redundant
             // do we need this lock?  No one should be able
             // to access it.
             BEGIN_WITH_FRAME_LOCK(w, ready_ff) {
                 steals = ready_ff->failed_nonlocal_steals++;
             } END_WITH_FRAME_LOCK(w, ready_ff);
         }
+        //if the ready_ff has all its push and steal attempts expended,
+        //feel free to take it
         if(steals >= w->g->max_nonlocal_steal_attempts) {
             goto take_frame;
-        } else {
+        } else { //just quit trying if we're here
             return 0; // failed to steal in this case
         }
     }
