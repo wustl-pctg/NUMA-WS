@@ -1377,7 +1377,6 @@ static int try_steal_victim_next_frame_ff(__cilkrts_worker *w,
                     continue;
                 } else {
                   BEGIN_WITH_FRAME_LOCK(w, ready_ff) {
-                      printf("tries: %d\n", tries);
                       //record how many tries it took to push the ready_ff
                       ready_ff->failed_nonlocal_steals += tries;
                   } END_WITH_FRAME_LOCK(w, ready_ff);
@@ -1386,7 +1385,6 @@ static int try_steal_victim_next_frame_ff(__cilkrts_worker *w,
                 }
             }
             BEGIN_WITH_FRAME_LOCK(w, ready_ff) {
-                printf("tries: %d\n", tries);
                 //record that the push threshold has been reached
                 ready_ff->failed_nonlocal_steals += tries;
             } END_WITH_FRAME_LOCK(w, ready_ff);
