@@ -1024,13 +1024,13 @@ check_frame_for_designated_socket(__cilkrts_worker *w, full_frame *ff) {
     if(w->l->my_socket_id != socket_id) {
 
         int tries = 0;
-        while(tries < w->g->max_nonlocal_steal_attempts) {
+        while(!w_to_push && tries < w->g->max_nonlocal_steal_attempts) {
             w_to_push = pick_random_worker_on_socket(w, ff->owner_socket_id);
             int res = push_next_frame_if_null(w_to_push, ff);
             if(res) {
                 break;
             } else {
-                tries++;
+                if(!w->g->disable_nonlocal_steal) tries++;
                 w_to_push = NULL;
             }
         }
@@ -1278,7 +1278,7 @@ static int choose_victim(__cilkrts_worker *w)
     int socket_offset = 0;
 
     //fall through the if block to find the right socket to steal from
-    if (locality_rand < w->g->local_percent || w->g->disable_nonlocal_steal) {
+    if (locality_rand < w->g->local_percent) {
         if(w->g->workers_per_socket > 1) {
             socket_offset = myrand(w) % (w->g->workers_per_socket - 1);
         } else { // only one worker per socket; fail in this case
@@ -1300,6 +1300,7 @@ static int choose_victim(__cilkrts_worker *w)
     }
 
 #else // ifndef BIN_METHOD
+    //NOTE: This was an early experiment and was never used
     // select which type of stealing to do
     // non-locality to locality: 1-to-k ratio, need 0 ... k
     int locality_rand = myrand(w) % (w->g->locality_ratio + 1);
@@ -1402,9 +1403,11 @@ static int try_steal_victim_next_frame_ff(__cilkrts_worker *w,
         if (ready_ff->owner_socket_id == victim->l->my_socket_id) { //XXX: possibly redundant
             // do we need this lock?  No one should be able
             // to access it.
-            BEGIN_WITH_FRAME_LOCK(w, ready_ff) {
-                steals = ready_ff->failed_nonlocal_steals++;
-            } END_WITH_FRAME_LOCK(w, ready_ff);
+            if(!w->g->disable_nonlocal_steal){
+              BEGIN_WITH_FRAME_LOCK(w, ready_ff) {
+                  steals = ready_ff->failed_nonlocal_steals++;
+              } END_WITH_FRAME_LOCK(w, ready_ff);
+            }
         }
         //if the ready_ff has all its push and steal attempts expended,
         //feel free to take it
@@ -1490,14 +1493,7 @@ static void random_steal(__cilkrts_worker *w)
 
                 // If we're replaying a log, verify that this the correct frame
                 // to steal from the victim
-                if ((w->g->disable_nonlocal_steal &&
-                     w->l->my_socket_id != victim->l->my_socket_id) ||
-                    !replay_match_victim_pedigree(w, victim)) {
-                    // the flag disable_nonlocal_steal would have flipped
-                    // between the last time we read and succeeding dekker
-                    // if that's the case, we give up this steal
-                    // Note that this can only happen during the first randome steal
-                    // after it flips
+                if (!replay_match_victim_pedigree(w, victim)) {
                     // Abort the steal attempt. decrement_E(victim) to counter
                     // the increment_E(victim) done by the dekker protocol
                     decrement_E(victim);
@@ -1505,8 +1501,6 @@ static void random_steal(__cilkrts_worker *w)
                 }
 
                 if (proceed_with_steal) {
-                    CILK_ASSERT(!w->g->disable_nonlocal_steal ||
-                            victim->l->my_socket_id == w->l->my_socket_id);
 
                     START_INTERVAL(w, INTERVAL_STEAL_SUCCESS) {
 
