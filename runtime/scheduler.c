@@ -944,25 +944,8 @@ static __cilkrts_worker *pick_random_worker_on_socket(__cilkrts_worker *w,
     int32_t lower_id = socket_id * workers_per_socket; // inclusive
     int32_t upper_id = (socket_id + 1) * workers_per_socket; // exclusive
 
-    unsigned picked_id;
-
-    //picked_id = myrand(w) % workers_per_socket + lower_id;
-    //picked_w = w->g->workers[picked_id];
-
-    unsigned success = 0;
-    //only pick workers where the top of the deque hasn't reached the threshold
-    do{
-      picked_id = myrand(w) % workers_per_socket + lower_id;
-      picked_w = w->g->workers[picked_id];
-
-      full_frame *top_of_deque = picked_w->l->frame_ff;
-
-      if(top_of_deque){
-              if (top_of_deque->failed_nonlocal_steals < w->g->max_nonlocal_steal_attempts) success = 1;
-      } else { //if there is no work, there's no need to worry about the top of the deque
-        success = 1;
-      }
-    } while (!success);
+    unsigned picked_id = myrand(w) % workers_per_socket + lower_id;
+    picked_w = w->g->workers[picked_id];
 
     return picked_w;
 }
@@ -1033,7 +1016,7 @@ check_frame_for_designated_socket(__cilkrts_worker *w, full_frame *ff) {
     // if the user doesn't set anything, it's free for all
     if(ff->owner_socket_id == ANY_SOCKET) { return NULL; }
 
-    //CILK_ASSERT(ff->failed_nonlocal_steals == 0);
+    CILK_ASSERT(ff->failed_nonlocal_steals == 0);
     ASSERT_FRAME_LOCK_OWNED(ff);
     __cilkrts_worker *w_to_push = NULL;
 
@@ -1426,13 +1409,6 @@ static int try_steal_victim_next_frame_ff(__cilkrts_worker *w,
         //if the ready_ff has all its push and steal attempts expended,
         //feel free to take it
         if(steals >= w->g->max_nonlocal_steal_attempts) {
-            //incriment the counter on the full frame on the deque
-            full_frame *top_of_deque = victim->l->frame_ff;
-            if(top_of_deque){
-              BEGIN_WITH_FRAME_LOCK(w, top_of_deque) {
-                  top_of_deque->failed_nonlocal_steals++;
-              } END_WITH_FRAME_LOCK(w, top_of_deque);
-            }
             goto take_frame;
         } else { //just quit trying if we're here
             return 0; // failed to steal in this case
