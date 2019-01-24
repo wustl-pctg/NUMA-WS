@@ -944,25 +944,8 @@ static __cilkrts_worker *pick_random_worker_on_socket(__cilkrts_worker *w,
     int32_t lower_id = socket_id * workers_per_socket; // inclusive
     int32_t upper_id = (socket_id + 1) * workers_per_socket; // exclusive
 
-    unsigned picked_id;
-
-    //picked_id = myrand(w) % workers_per_socket + lower_id;
-    //picked_w = w->g->workers[picked_id];
-
-    unsigned success = 0;
-    //only pick workers where the top of the deque hasn't reached the threshold
-    do{
-      picked_id = myrand(w) % workers_per_socket + lower_id;
-      picked_w = w->g->workers[picked_id];
-
-      full_frame *top_of_deque = picked_w->l->frame_ff;
-
-      if(top_of_deque){
-              if (top_of_deque->failed_nonlocal_steals < w->g->max_nonlocal_steal_attempts) success = 1;
-      } else { //if there is no work, there's no need to worry about the top of the deque
-        success = 1;
-      }
-    } while (!success);
+    unsigned picked_id = myrand(w) % workers_per_socket + lower_id;
+    picked_w = w->g->workers[picked_id];
 
     return picked_w;
 }
@@ -1033,7 +1016,7 @@ check_frame_for_designated_socket(__cilkrts_worker *w, full_frame *ff) {
     // if the user doesn't set anything, it's free for all
     if(ff->owner_socket_id == ANY_SOCKET) { return NULL; }
 
-    //CILK_ASSERT(ff->failed_nonlocal_steals == 0);
+    CILK_ASSERT(ff->failed_nonlocal_steals == 0);
     ASSERT_FRAME_LOCK_OWNED(ff);
     __cilkrts_worker *w_to_push = NULL;
 
@@ -1041,13 +1024,13 @@ check_frame_for_designated_socket(__cilkrts_worker *w, full_frame *ff) {
     if(w->l->my_socket_id != socket_id) {
 
         int tries = 0;
-        while(!w_to_push && tries < w->g->max_nonlocal_steal_attempts) {
+        while(tries < w->g->max_nonlocal_steal_attempts) {
             w_to_push = pick_random_worker_on_socket(w, ff->owner_socket_id);
             int res = push_next_frame_if_null(w_to_push, ff);
             if(res) {
                 break;
             } else {
-                if(!w->g->disable_nonlocal_steal) tries++;
+                tries++;
                 w_to_push = NULL;
             }
         }
@@ -1295,7 +1278,7 @@ static int choose_victim(__cilkrts_worker *w)
     int socket_offset = 0;
 
     //fall through the if block to find the right socket to steal from
-    if (locality_rand < w->g->local_percent) {
+    if (locality_rand < w->g->local_percent || w->g->disable_nonlocal_steal) {
         if(w->g->workers_per_socket > 1) {
             socket_offset = myrand(w) % (w->g->workers_per_socket - 1);
         } else { // only one worker per socket; fail in this case
@@ -1317,7 +1300,6 @@ static int choose_victim(__cilkrts_worker *w)
     }
 
 #else // ifndef BIN_METHOD
-    //NOTE: This was an early experiment and was never actually used
     // select which type of stealing to do
     // non-locality to locality: 1-to-k ratio, need 0 ... k
     int locality_rand = myrand(w) % (w->g->locality_ratio + 1);
@@ -1358,19 +1340,6 @@ static int choose_victim(__cilkrts_worker *w)
     return n;
 }
 
-//we incriment the counter in the frame on the top of the deque to keep track of the
-//number of time the frame has been "covered" by the mailbox
-void incriment_top_of_deque(__cilkrts_worker *w,
-                                   __cilkrts_worker *victim){
- full_frame *top_of_deque = victim->l->frame_ff;
- if(top_of_deque){
-   BEGIN_WITH_FRAME_LOCK(w, top_of_deque) {
-       top_of_deque->failed_nonlocal_steals++;
-   } END_WITH_FRAME_LOCK(w, top_of_deque);
- }
-
-}
-
 // return 0 if failed to steal, and 1 if succeed
 static int try_steal_victim_next_frame_ff(__cilkrts_worker *w,
                                           __cilkrts_worker *victim)
@@ -1385,10 +1354,7 @@ static int try_steal_victim_next_frame_ff(__cilkrts_worker *w,
     CILK_ASSERT(!(ready_ff->sync_master && __cilkrts_check_synched(ready_ff)));
 
     //if the ready_ff doesn't have an owner socket, feel free to take it
-    if (ready_ff->owner_socket_id == ANY_SOCKET) {
-      incriment_top_of_deque(w,victim);
-      goto take_frame;
-    }
+    if (ready_ff->owner_socket_id == ANY_SOCKET) { goto take_frame; }
 
     //if the ready_ff's owner socket and the victim's socket id do not match
     //we should attempt to move the ready_ff to the correct socket. This can happen
@@ -1400,7 +1366,6 @@ static int try_steal_victim_next_frame_ff(__cilkrts_worker *w,
 
         //if the theif's socket id matches the ready_ff's owner socket, feel free to take it
         if(ready_ff->owner_socket_id == w->l->my_socket_id) {
-            incriment_top_of_deque(w,victim);
             goto take_frame;
         } else { //if the theif's socket doesn't match, try to push the ready_ff to the correct socket
             int tries = 0;
@@ -1415,7 +1380,6 @@ static int try_steal_victim_next_frame_ff(__cilkrts_worker *w,
                       //record how many tries it took to push the ready_ff
                       ready_ff->failed_nonlocal_steals += tries;
                   } END_WITH_FRAME_LOCK(w, ready_ff);
-                    incriment_top_of_deque(w,victim);
                     transfer_next_frame(victim, w_to_push, ready_ff);
                     return 0; // failed to steal in this case
                 }
@@ -1424,14 +1388,11 @@ static int try_steal_victim_next_frame_ff(__cilkrts_worker *w,
                 //record that the push threshold has been reached
                 ready_ff->failed_nonlocal_steals += tries;
             } END_WITH_FRAME_LOCK(w, ready_ff);
-
-            incriment_top_of_deque(w,victim);
             goto take_frame;
         }
     //if the theif and the victim are on the same socket and the ready_ff is on
     //the correct socket, feel free to take it
     } else if (victim->l->my_socket_id == w->l->my_socket_id) {
-        incriment_top_of_deque(w,victim);
         goto take_frame;
 
     //the theif from a forign socket is attempting to steal from a mailbox
@@ -1441,16 +1402,13 @@ static int try_steal_victim_next_frame_ff(__cilkrts_worker *w,
         if (ready_ff->owner_socket_id == victim->l->my_socket_id) { //XXX: possibly redundant
             // do we need this lock?  No one should be able
             // to access it.
-            if(!w->g->disable_nonlocal_steal){
-              BEGIN_WITH_FRAME_LOCK(w, ready_ff) {
-                  steals = ready_ff->failed_nonlocal_steals++;
-              } END_WITH_FRAME_LOCK(w, ready_ff);
-            }
+            BEGIN_WITH_FRAME_LOCK(w, ready_ff) {
+                steals = ready_ff->failed_nonlocal_steals++;
+            } END_WITH_FRAME_LOCK(w, ready_ff);
         }
         //if the ready_ff has all its push and steal attempts expended,
         //feel free to take it
         if(steals >= w->g->max_nonlocal_steal_attempts) {
-            incriment_top_of_deque(w,victim);
             goto take_frame;
         } else { //just quit trying if we're here
             return 0; // failed to steal in this case
@@ -1532,7 +1490,14 @@ static void random_steal(__cilkrts_worker *w)
 
                 // If we're replaying a log, verify that this the correct frame
                 // to steal from the victim
-                if (!replay_match_victim_pedigree(w, victim)) {
+                if ((w->g->disable_nonlocal_steal &&
+                     w->l->my_socket_id != victim->l->my_socket_id) ||
+                    !replay_match_victim_pedigree(w, victim)) {
+                    // the flag disable_nonlocal_steal would have flipped
+                    // between the last time we read and succeeding dekker
+                    // if that's the case, we give up this steal
+                    // Note that this can only happen during the first randome steal
+                    // after it flips
                     // Abort the steal attempt. decrement_E(victim) to counter
                     // the increment_E(victim) done by the dekker protocol
                     decrement_E(victim);
@@ -1540,6 +1505,8 @@ static void random_steal(__cilkrts_worker *w)
                 }
 
                 if (proceed_with_steal) {
+                    CILK_ASSERT(!w->g->disable_nonlocal_steal ||
+                            victim->l->my_socket_id == w->l->my_socket_id);
 
                     START_INTERVAL(w, INTERVAL_STEAL_SUCCESS) {
 
