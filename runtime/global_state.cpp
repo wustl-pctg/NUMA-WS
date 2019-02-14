@@ -282,7 +282,7 @@ int set_param_imp(global_state_t* g, const CHAR_T* param, const CHAR_T* value)
             g->P = hardware_cpu_count;
         return ret;
     }
-    /* disallow the option 
+    /* disallow the option
     else if (strmatch(param, s_max_user_workers))
     {
         // ** UNDOCUMENTED **
@@ -363,7 +363,7 @@ int calc_max_user_workers(global_state_t *g)
     // Calculate it
     return std::max(3, g->P * 2);
     */
-    return 1; 
+    return 1;
 }
 
 } // end unnamed namespace
@@ -515,11 +515,11 @@ global_state_t* cilkg_get_user_settable_values()
          * Locality Global Variables
          */
         g->num_sockets = 4; // assume 4 socket machine
-    
+
         if (cilkos_getenv(envstr, sizeof(envstr), "CILK_NUM_SOCKETS"))
             // Limit to no less than 1 and no more than 4
             store_int(&g->num_sockets, envstr, 1, 4);
-    
+
         if (cilkos_getenv(envstr, sizeof(envstr), "CILK_WORKERS_PER_SOCKET")) {
             // Limit to no less than 1 and no more than 4
             store_int(&g->workers_per_socket, envstr, 1, 8);
@@ -531,7 +531,7 @@ global_state_t* cilkg_get_user_settable_values()
                 g->workers_per_socket = g->P / g->num_sockets;
             }
         }
-        
+
         if (!cilkos_getenv(envstr, sizeof(envstr), "CILK_NWORKERS")) {
             g->P = g->num_sockets * g->workers_per_socket;
         }
@@ -539,28 +539,28 @@ global_state_t* cilkg_get_user_settable_values()
         CILK_ASSERT(g->P == g->num_sockets * g->workers_per_socket);
         //set the number of workers now
         // g->P = g->num_sockets * g->workers_per_socket;
-    
-    
+
+
     #ifdef BIN_METHOD
         // ANGE XXX: Why not just initialize as a fraction and scale accordingly
         // Initialize locality variables
         g->local_percent = 70;
-        g->neighbor_percent = 20;
-        g->remote_percent = 10;
-    
+        g->neighbor_percent = 24;
+        g->remote_percent = 6;
+
         //Environment variables for locality
         if (cilkos_getenv(envstr, sizeof(envstr), "CILK_LOCAL_PERCENT"))
             // Limit to 0 to 100 percent
             store_int(&g->local_percent, envstr, 0, 100);
-    
+
         if (cilkos_getenv(envstr, sizeof(envstr), "CILK_NEIGHBOR_PERCENT"))
             // Limit to 0 to 100 percent
             store_int(&g->neighbor_percent, envstr, 0, 100);
-    
+
         if (cilkos_getenv(envstr, sizeof(envstr), "CILK_REMOTE_PERCENT"))
             // Limit to 0 to 100 percent
             store_int(&g->remote_percent, envstr, 0, 100);
-    
+
         if(g->num_sockets == 1) {
             printf("WARNING: You are using 1 socket. CILK_REMOTE_PERCENT and CILK_NEIGHBOR_PERCENT is ignored!\n");
             g->remote_percent = 0;
@@ -569,12 +569,12 @@ global_state_t* cilkg_get_user_settable_values()
             printf("WARNING: You are using 2 sockets. CILK_REMOTE_PERCENT is ignored!\n");
             g->remote_percent = 0;
         }
-    
+
     #else // ifndef BIN_METHOD
         // Initialize locality variables
         // ANGE XXX: modified to 1-to-k ratio for easier interpretation
         g->locality_ratio = 2; // 2 for equal likelyhood
-    
+
         // Environment variables for locality
         if (cilkos_getenv(envstr, sizeof(envstr), "CILK_LOCALITY_RATIO"))
             // Limit to no less than 2 (50/50) and no more than 10000
@@ -585,7 +585,9 @@ global_state_t* cilkg_get_user_settable_values()
         if (cilkos_getenv(envstr, sizeof(envstr), "CILK_MAX_NONLOCAL_STEAL_ATTEMPTS"))
             // Limit to 0 to 100 percent
             store_int(&g->max_nonlocal_steal_attempts, envstr, 0, INT_MAX);
-    
+        //duplicate this for disabling nonlocal steal
+        g->orginal_max_nonlocal_steal_attempts = g->max_nonlocal_steal_attempts;
+
         g->disable_nonlocal_steal = 0;
     }
 
@@ -649,7 +651,7 @@ global_state_t* cilkg_init_global_state()
 
     // Number of bytes/address - validation for debugger integration
     g->addr_size = sizeof(void *);
-    g->pin_top_level_frame_at_socket = ANY_SOCKET; // default; could be reset by user 
+    g->pin_top_level_frame_at_socket = ANY_SOCKET; // default; could be reset by user
 
     __cilkrts_init_stats(&g->stats);
 

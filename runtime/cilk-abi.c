@@ -80,11 +80,11 @@
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
+#include <limits.h>
 
 #ifdef _MSC_VER
 /* Some versions of icc don't support limits.h on Linux if
    gcc 4.3 or newer is installed. */
-#include <limits.h>
 
 /* Declare _ReturnAddress compiler intrinsic */
 void * _ReturnAddress(void);
@@ -857,14 +857,14 @@ CILK_ABI_VOID __cilkrts_unset_pinning_info() {
 CILK_ABI_VOID __cilkrts_disable_nonlocal_steal() {
     global_state_t *g = cilkg_get_global_state();
     CILK_ASSERT(g != NULL);
-    g->disable_nonlocal_steal = 1;
+    g->max_nonlocal_steal_attempts = INT_MAX;
     __cilkrts_fence();
 }
 
 CILK_ABI_VOID __cilkrts_enable_nonlocal_steal() {
     __cilkrts_worker *w = __cilkrts_get_tls_worker();
     CILK_ASSERT(w != NULL);
-    w->g->disable_nonlocal_steal = 0;
+    w->g->max_nonlocal_steal_attempts = w->g->orginal_max_nonlocal_steal_attempts;
     __cilkrts_fence();
 }
 

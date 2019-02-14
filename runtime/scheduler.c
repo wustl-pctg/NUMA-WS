@@ -1030,7 +1030,7 @@ check_frame_for_designated_socket(__cilkrts_worker *w, full_frame *ff) {
             if(res) {
                 break;
             } else {
-                if(!w->g->disable_nonlocal_steal) tries++;
+                tries++;
                 w_to_push = NULL;
             }
         }
@@ -1403,11 +1403,9 @@ static int try_steal_victim_next_frame_ff(__cilkrts_worker *w,
         if (ready_ff->owner_socket_id == victim->l->my_socket_id) { //XXX: possibly redundant
             // do we need this lock?  No one should be able
             // to access it.
-            if(!w->g->disable_nonlocal_steal){
-              BEGIN_WITH_FRAME_LOCK(w, ready_ff) {
-                  steals = ready_ff->failed_nonlocal_steals++;
-              } END_WITH_FRAME_LOCK(w, ready_ff);
-            }
+            BEGIN_WITH_FRAME_LOCK(w, ready_ff) {
+                steals = ready_ff->failed_nonlocal_steals++;
+            } END_WITH_FRAME_LOCK(w, ready_ff);
         }
         //if the ready_ff has all its push and steal attempts expended,
         //feel free to take it

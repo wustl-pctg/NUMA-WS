@@ -201,7 +201,7 @@ struct global_state_t { /* COMMON_PORTABLE */
     statistics stats;    ///< Statistics on use of runtime
 
     struct total_stats *sched_stats;
-    
+
     /**
      * @brief USER SETTING: Maximum number of stacks the runtime will
      * allocate (apart from those created by the OS when worker
@@ -279,9 +279,11 @@ struct global_state_t { /* COMMON_PORTABLE */
      */
     int num_sockets; // the number of sockets used in the computation
     int workers_per_socket; // the number of workers on each socket
-    int max_nonlocal_steal_attempts; // global config param --- if a ready frame fails to 
+    int max_nonlocal_steal_attempts; // global config param --- if a ready frame fails to
           // be stolen after max_nonlocal_steal_attempts times, allow a
           // nonlocal worker to resume it
+    int orginal_max_nonlocal_steal_attempts; //this stores the above variable when
+          //we need to disable nonlocal steal
 #ifndef BIN_METHOD
     int locality_ratio; // the denominator to determine the regular work stealing likelyhood
 #endif
@@ -292,8 +294,8 @@ struct global_state_t { /* COMMON_PORTABLE */
 #endif
 
     /**
-     * @brief TRUE when workers should steal only from its own socket 
-     * It should be set infrequently but read frequently.  
+     * @brief TRUE when workers should steal only from its own socket
+     * It should be set infrequently but read frequently.
      * Separately from other read-only fields.
      */
     char cache_buf_3[64];
