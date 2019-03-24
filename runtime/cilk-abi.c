@@ -836,6 +836,7 @@ CILK_ABI_VOID __cilkrts_set_pinning_info(int32_t socket_id) {
     __cilkrts_worker *w = __cilkrts_get_tls_worker();
     CILK_ASSERT(w != NULL);
     __cilkrts_stack_frame *sf = w->current_stack_frame;
+    w->g->max_nonlocal_steal_attempts = INT_MAX;
     CILK_ASSERT(sf != NULL);
 
     sf->flags |= CILK_FRAME_WITH_DESIGNATED_SOCKET;
@@ -847,6 +848,7 @@ CILK_ABI_VOID __cilkrts_unset_pinning_info() {
     __cilkrts_worker *w = __cilkrts_get_tls_worker();
     CILK_ASSERT(w != NULL);
     __cilkrts_stack_frame *sf = w->current_stack_frame;
+    w->g->max_nonlocal_steal_attempts = w->g->orginal_max_nonlocal_steal_attempts;
     CILK_ASSERT(sf != NULL);
 
     // sf->flags &= ~CILK_FRAME_WITH_DESIGNATED_SOCKET;
