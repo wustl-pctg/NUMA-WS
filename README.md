@@ -1,13 +1,11 @@
 # NUMA-WS
 
 These are a series of benchmarks to test and demonstrate the capability of the
-NUMA-WS runtime system. Read more [here](https://arxiv.org/abs/1806.11128). You
+NUMA-WS runtime system. Read more [here](https://ieeexplore.ieee.org/document/8573486). You
 can find the companion benchmarks [here](https://gitlab.com/wustl-pctg/numa-ws-benchmarks).
 
-## Future Changes
+##  Using the runtime
 Currently, the NUMA aware runtime calls need to be added to programs *by hand*.
-In the future these runtime calls will be inserted at compile time and new
-syntax will be introduced.
 
 ## Getting Started
 We recommend using [Tapir](http://cilk.mit.edu/download/) to compile your programs
@@ -35,7 +33,11 @@ ex: CILK_NUM_SOCKETS=1 CILK_WORKERS_PER_SOCKET=8 CILK_NWORKERS=8 ./foo
 ## New runtime calls for locality
 - __cilkrts_set_pinning_info(int) sets the continuation with a socket to be pushed to.
 - __cilkrts_unset_pinning_info() unsets all pinning info for the continuation.
-- __cilkrts_disable_nonlocal_steal() only allows for steals from the local socket.
-- __cilkrts_enable_nonlocal_steal() allows for steals from outside the local socket.
 - __cilkrts_pin_top_level_frame_at_socket() allows for the top level frame to have pinning information.
 
+## Cititation
+Please use the following citiation when using this runtime in your work:
+
+J. Deters, J. Wu, Y. Xu and I. Lee, "A NUMA-Aware Provably-Efficient Task-Parallel Platform Based on the Work-First Principle", 
+2018 IEEE International Symposium on Workload Characterization (IISWC), 2018. 
+Available: https://ieeexplore.ieee.org/document/8573486.
