@@ -2,7 +2,7 @@
 
 These are a series of benchmarks to test and demonstrate the capability of the
 NUMA-WS runtime system. Read more [here](https://ieeexplore.ieee.org/document/8573486). You
-can find the companion benchmarks [here](https://gitlab.com/wustl-pctg/numa-ws-benchmarks).
+can find the companion benchmarks [here](https://github.com/wustl-pctg/NUMA-WS-Benchmarks).
 
 ##  Using the runtime
 Currently, the NUMA aware runtime calls need to be added to programs *by hand*.
