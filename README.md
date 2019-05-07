@@ -18,6 +18,7 @@ to work with this runtime.
     3. reconfigure_likwid.sh: provides the ability to use the LIKWID profiler.
 4. make
 5. make install
+**Note:** NUMA-WS assumes an 8 core machine. Change CORES_PER_SOCKET in /include/cilk/common.h to adapt it to your machine.
 
 ## Locality Paramaters added to this runtime
 - CILK_NUM_SOCKETS is the number of sockets the computation will run on.
