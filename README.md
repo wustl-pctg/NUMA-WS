@@ -48,4 +48,4 @@ Available: https://ieeexplore.ieee.org/document/8573486.
 This research was supported in part by National Science Foundation under grant number CCF-1527692 and CCF-1733873.
 
 Any opinions, findings, and conclusions or recommendations expressed in this material are those of the author(s) 
-and do not necessarily reflect the views of the National Science Foundation
+and do not necessarily reflect the views of the National Science Foundation.
